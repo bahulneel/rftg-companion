@@ -15,6 +15,17 @@ let nextId = 1
 function formatDetail(detail: unknown): string | undefined {
   if (detail === undefined) return undefined
   if (typeof detail === 'string') return detail
+  if (detail instanceof Error) {
+    return JSON.stringify(
+      {
+        name: detail.name,
+        message: detail.message,
+        stack: detail.stack,
+      },
+      null,
+      2,
+    )
+  }
   try {
     return JSON.stringify(detail, null, 2)
   } catch {

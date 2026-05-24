@@ -110,7 +110,7 @@ export const useGameRoom = createSharedComposable(() => {
       if (newState) broadcastState?.(newState)
     }
 
-    room.onPeerJoin((joinedPeerId) => {
+    room.onPeerJoin = (joinedPeerId) => {
       if (joinedPeerId === store.peerId) return
 
       diag.log('success', 'Peer joined room', { joinedPeerId, isHostRole })
@@ -129,9 +129,9 @@ export const useGameRoom = createSharedComposable(() => {
           expectedHost: hostPeerId,
         })
       }
-    })
+    }
 
-    room.onPeerLeave((leftPeerId) => {
+    room.onPeerLeave = (leftPeerId) => {
       diag.log('warn', 'Peer left room', { leftPeerId, isHostRole })
 
       if (isHostRole) {
@@ -142,7 +142,7 @@ export const useGameRoom = createSharedComposable(() => {
         diag.log('error', 'Host peer disconnected')
         startPeerPolling('Waiting for host after disconnect')
       }
-    })
+    }
   }
 
   function connectToRoom(
