@@ -7,6 +7,12 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
   css: ['~/assets/css/main.css'],
+  runtimeConfig: {
+    public: {
+      /** Origin for invite QR links (e.g. https://user.github.io). Falls back to window.location. */
+      siteUrl: process.env.NUXT_PUBLIC_SITE_URL || '',
+    },
+  },
   app: {
     baseURL: process.env.NUXT_APP_BASE_URL || '/',
     head: {

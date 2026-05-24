@@ -9,7 +9,6 @@ const props = defineProps<{
   hostPeerId?: string
 }>()
 
-const route = useRoute()
 const router = useRouter()
 const config = useRuntimeConfig()
 const store = useGameStore()

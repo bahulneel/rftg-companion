@@ -30,6 +30,7 @@ jobs:
       - run: npm run generate
         env:
           NUXT_APP_BASE_URL: /rftg-companion/
+          NUXT_PUBLIC_SITE_URL: https://bahulneel.github.io
 
       - uses: actions/upload-pages-artifact@v3
         with:

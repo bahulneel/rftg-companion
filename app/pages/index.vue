@@ -28,7 +28,7 @@ function joinFromInvite() {
 
       <p class="text-sm leading-relaxed text-slate-400">
         The host creates a game on their phone and shares a QR code.
-        Players scan it to connect directly to the host's WebRTC peer — no game server involved.
+        The host shares a QR code; players scan it to connect to the host device — no game server involved.
       </p>
 
       <button
