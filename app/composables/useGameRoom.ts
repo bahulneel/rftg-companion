@@ -16,15 +16,43 @@ type TrysteroRoom = ReturnType<typeof joinRoom>
 
 export function useGameRoom() {
   const store = useGameStore()
+  const diag = useConnectionDiagnostics()
   let room: TrysteroRoom | null = null
   let broadcastState: ((state: GameState, target?: string) => void) | null = null
   let sendAction: ((action: GameAction, target?: string) => void) | null = null
   let hostPeerId: string | null = null
+  let peerPollTimer: ReturnType<typeof setInterval> | null = null
 
   const hostReady = ref(false)
   const signalingWarning = ref('')
 
+  function stopPeerPolling() {
+    if (peerPollTimer) {
+      clearInterval(peerPollTimer)
+      peerPollTimer = null
+    }
+  }
+
+  function startPeerPolling(label: string) {
+    stopPeerPolling()
+    peerPollTimer = setInterval(() => {
+      if (!room) return
+      const peers = room.getPeers()
+      diag.log('info', `${label}: peer snapshot`, {
+        peerCount: peers.length,
+        peers,
+        selfId: store.peerId,
+        expectedHostPeerId: hostPeerId,
+        hostReady: hostReady.value,
+        storeConnected: store.connected,
+        hasGameState: !!store.state,
+      })
+    }, 4000)
+  }
+
   function leaveRoom() {
+    diag.log('info', 'Leaving room')
+    stopPeerPolling()
     room?.leave()
     room = null
     broadcastState = null
@@ -36,7 +64,15 @@ export function useGameRoom() {
   }
 
   function setupChannel(isHostRole: boolean) {
-    if (!room || !hostPeerId) return
+    if (!room || !hostPeerId) {
+      diag.log('warn', 'setupChannel skipped — room or hostPeerId missing', {
+        hasRoom: !!room,
+        hostPeerId,
+      })
+      return
+    }
+
+    diag.log('info', 'Setting up state/action channels', { isHostRole, hostPeerId })
 
     const [broadcast, onReceive] = room.makeAction<GameState>('state')
     const [send, onAction] = room.makeAction<GameAction>('action')
@@ -46,7 +82,14 @@ export function useGameRoom() {
 
     onReceive((state, fromPeerId) => {
       if (isHostRole) return
-      if (fromPeerId !== hostPeerId) return
+      if (fromPeerId !== hostPeerId) {
+        diag.log('warn', 'Ignored state from unexpected peer', { fromPeerId, expected: hostPeerId })
+        return
+      }
+      diag.log('success', 'Received game state from host', {
+        screen: state.screen,
+        playerCount: state.players.length,
+      })
       store.applyState(state)
     })
 
@@ -54,6 +97,7 @@ export function useGameRoom() {
       if (!isHostRole) return
       if (fromPeerId === store.peerId) return
 
+      diag.log('info', 'Host received guest action', { type: action.type, fromPeerId })
       const newState = store.dispatch(action)
       if (newState) broadcastState?.(newState)
     })
@@ -61,21 +105,34 @@ export function useGameRoom() {
     room.onPeerJoin((joinedPeerId) => {
       if (joinedPeerId === store.peerId) return
 
+      diag.log('success', 'Peer joined room', { joinedPeerId, isHostRole })
+
       if (isHostRole) {
         store.peerCount++
         if (store.state) broadcastState?.(store.state, joinedPeerId)
       } else if (joinedPeerId === hostPeerId) {
         store.peerCount = 1
         hostReady.value = true
+        diag.log('success', 'Host peer connected — guest link is live')
+        stopPeerPolling()
+      } else {
+        diag.log('warn', 'Guest saw unexpected peer join (not the host)', {
+          joinedPeerId,
+          expectedHost: hostPeerId,
+        })
       }
     })
 
     room.onPeerLeave((leftPeerId) => {
+      diag.log('warn', 'Peer left room', { leftPeerId, isHostRole })
+
       if (isHostRole) {
         store.peerCount = Math.max(0, store.peerCount - 1)
       } else if (leftPeerId === hostPeerId) {
         store.peerCount = 0
         hostReady.value = false
+        diag.log('error', 'Host peer disconnected')
+        startPeerPolling('Waiting for host after disconnect')
       }
     })
   }
@@ -86,38 +143,76 @@ export function useGameRoom() {
     isHostRole: boolean,
     expectedHostPeerId?: string,
   ): boolean {
+    const ns = roomNamespace(code, namespaceHostId)
+    diag.log('info', 'Joining Trystero room', {
+      code,
+      namespace: ns,
+      isHostRole,
+      selfId,
+      expectedHostPeerId,
+      appId: APP_ID,
+    })
+
     const callbacks = expectedHostPeerId
       ? {
           onPeerHandshake(peerId: string) {
+            diag.log('info', 'Guest handshake with peer', { peerId, expectedHostPeerId })
             if (peerId !== expectedHostPeerId) {
+              diag.log('error', 'Handshake rejected — peer is not the expected host', {
+                peerId,
+                expectedHostPeerId,
+              })
               throw new Error('Unexpected peer')
             }
+            diag.log('success', 'Guest handshake accepted host peer', { peerId })
           },
-          onJoinError() {
-            signalingWarning.value =
+          onJoinError(details: {
+            appId?: string
+            roomId?: string
+            peerId?: string
+            error?: unknown
+          }) {
+            const message =
               'Having trouble reaching the host. Make sure the host still has the game open.'
+            signalingWarning.value = message
+            diag.log('error', message, details)
           },
         }
       : {
-          onJoinError() {
-            signalingWarning.value =
+          onJoinError(details: {
+            appId?: string
+            roomId?: string
+            peerId?: string
+            error?: unknown
+          }) {
+            const message =
               'Signaling is limited — players may need to retry joining from the QR code.'
+            signalingWarning.value = message
+            diag.log('error', message, details)
           },
         }
 
     try {
       room = joinRoom(
         { appId: APP_ID, rtcConfig: RTC_CONFIG },
-        roomNamespace(code, namespaceHostId),
+        ns,
         callbacks,
       )
+      const initialPeers = room.getPeers()
+      diag.log('info', 'Trystero room joined', {
+        initialPeerCount: initialPeers.length,
+        initialPeers,
+      })
       setupChannel(isHostRole)
       store.connected = true
+      diag.log('success', 'Room connection established', { connected: true })
       return true
-    } catch {
-      signalingWarning.value = isHostRole
+    } catch (err) {
+      const message = isHostRole
         ? 'Could not open the listening room. Refresh and try again.'
         : 'Could not join the host room. Check the invite link and try again.'
+      signalingWarning.value = message
+      diag.log('error', message, err)
       return false
     }
   }
@@ -125,6 +220,7 @@ export function useGameRoom() {
   function startHost(code: string): boolean {
     if (import.meta.server) return false
 
+    diag.log('info', 'Starting host session', { code, selfId })
     leaveRoom()
 
     hostPeerId = selfId
@@ -132,13 +228,22 @@ export function useGameRoom() {
     store.setPeerId(selfId)
     store.initAsHost(code, selfId)
 
-    return connectToRoom(code, selfId, true)
+    const ok = connectToRoom(code, selfId, true)
+    if (ok) startPeerPolling('Host listening')
+    return ok
   }
 
   function joinHost(code: string, expectedHostPeerId: string): boolean {
     if (import.meta.server) return false
 
+    diag.log('info', 'Guest joining host session', {
+      code,
+      expectedHostPeerId,
+      selfId,
+    })
+
     if (expectedHostPeerId === selfId) {
+      diag.log('error', 'Cannot join your own host peer id')
       return false
     }
 
@@ -148,7 +253,9 @@ export function useGameRoom() {
     hostReady.value = false
     store.setPeerId(selfId)
 
-    return connectToRoom(code, expectedHostPeerId, false, expectedHostPeerId)
+    const ok = connectToRoom(code, expectedHostPeerId, false, expectedHostPeerId)
+    if (ok) startPeerPolling('Guest waiting for host peer')
+    return ok
   }
 
   function hostAction(action: GameAction) {
@@ -163,9 +270,17 @@ export function useGameRoom() {
     if (store.isHost) {
       return hostAction(action)
     }
-    if (!hostPeerId) return
+    if (!hostPeerId) {
+      diag.log('warn', 'clientAction dropped — no host peer id', { type: action.type })
+      return
+    }
     sendAction?.(action, hostPeerId)
   }
+
+  watch(hostReady, (ready, wasReady) => {
+    if (ready === wasReady) return
+    diag.log(ready ? 'success' : 'warn', `hostReady → ${ready}`)
+  })
 
   onUnmounted(() => leaveRoom())
 

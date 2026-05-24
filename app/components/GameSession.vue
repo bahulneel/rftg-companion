@@ -12,7 +12,8 @@ const props = defineProps<{
 const router = useRouter()
 const config = useRuntimeConfig()
 const store = useGameStore()
-const { startHost, joinHost, clientAction, hostReady, selfId } = useGameRoom()
+const { startHost, joinHost, clientAction, hostReady, signalingWarning, selfId } = useGameRoom()
+const diag = useConnectionDiagnostics()
 
 const playerName = ref('')
 const localSelections = ref<PhaseId[]>([])
@@ -36,7 +37,16 @@ const joinUrl = computed(() => {
 })
 
 onMounted(async () => {
+  diag.log('info', 'GameSession mounted', {
+    mode: props.mode,
+    code: props.code,
+    hostPeerId: props.hostPeerId,
+    userAgent: import.meta.client ? navigator.userAgent : 'server',
+    online: import.meta.client ? navigator.onLine : undefined,
+  })
+
   if (!isValidRoomCode(props.code)) {
+    diag.log('error', 'Invalid room code — redirecting home', { code: props.code })
     router.replace('/')
     return
   }
@@ -46,18 +56,27 @@ onMounted(async () => {
 
   try {
     if (props.mode === 'host') {
-      await startHost(props.code)
+      const ok = startHost(props.code)
+      if (!ok) connectionError.value = 'Failed to start hosting. See connection log.'
     } else {
       if (!props.hostPeerId) {
         connectionError.value = 'Missing host peer. Scan the host QR code to join.'
+        diag.log('error', connectionError.value)
         return
       }
-      await joinHost(props.code, props.hostPeerId)
+      const ok = joinHost(props.code, props.hostPeerId)
+      if (!ok) connectionError.value = 'Failed to join host. See connection log.'
     }
-  } catch {
+  } catch (err) {
     connectionError.value = 'Failed to establish WebRTC connection.'
+    diag.log('error', connectionError.value, err)
   } finally {
     connecting.value = false
+    diag.log('info', 'Initial connection attempt finished', {
+      connectionError: connectionError.value || null,
+      hostReady: hostReady.value,
+      hasState: !!store.state,
+    })
   }
 })
 
@@ -134,6 +153,20 @@ watch(
   },
 )
 
+watch(joinUrl, (url) => {
+  if (url) diag.log('success', 'Host invite link ready', { joinUrl: url })
+})
+
+watch(signalingWarning, (warning) => {
+  if (warning) diag.log('warn', 'Signaling warning shown to user', { warning })
+})
+
+watch(hostReady, (ready) => {
+  if (props.mode === 'guest' && ready) {
+    diag.log('success', 'Guest UI: host is ready — showing lobby')
+  }
+})
+
 async function copyInviteLink() {
   if (!joinUrl.value) return
   await navigator.clipboard.writeText(joinUrl.value)
@@ -156,6 +189,10 @@ async function copyInviteLink() {
     <div v-else-if="mode === 'guest' && !hostReady && !store.state" class="space-y-4 text-center text-slate-400">
       <p class="animate-pulse">Waiting for host peer...</p>
       <p class="text-xs">The host must have the game open on their device.</p>
+      <p v-if="signalingWarning" class="text-xs text-amber-400/90">{{ signalingWarning }}</p>
+      <p class="text-xs text-slate-600">
+        Open <span class="text-slate-500">Connection log</span> below to copy diagnostics for troubleshooting.
+      </p>
     </div>
 
     <template v-else-if="store.state">
@@ -320,5 +357,7 @@ async function copyInviteLink() {
         </div>
       </div>
     </template>
+
+    <ConnectionDiagnosticsDrawer />
   </div>
 </template>
