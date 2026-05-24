@@ -56,7 +56,7 @@ onMounted(async () => {
 
   try {
     if (props.mode === 'host') {
-      const ok = startHost(props.code)
+      const ok = await startHost(props.code)
       if (!ok) connectionError.value = 'Failed to start hosting. See connection log.'
     } else {
       if (!props.hostPeerId) {
@@ -64,7 +64,7 @@ onMounted(async () => {
         diag.log('error', connectionError.value)
         return
       }
-      const ok = joinHost(props.code, props.hostPeerId)
+      const ok = await joinHost(props.code, props.hostPeerId)
       if (!ok) connectionError.value = 'Failed to join host. See connection log.'
     }
   } catch (err) {

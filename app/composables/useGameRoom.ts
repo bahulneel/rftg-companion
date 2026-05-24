@@ -1,3 +1,4 @@
+import { createSharedComposable } from '@vueuse/core'
 import { joinRoom, selfId } from 'trystero'
 import type { GameAction, GameState } from '~/types/game'
 import { useGameStore } from '~/stores/game'
@@ -14,7 +15,7 @@ const RTC_CONFIG: RTCConfiguration = {
 
 type TrysteroRoom = ReturnType<typeof joinRoom>
 
-export function useGameRoom() {
+export const useGameRoom = createSharedComposable(() => {
   const store = useGameStore()
   const diag = useConnectionDiagnostics()
   let room: TrysteroRoom | null = null
@@ -50,10 +51,10 @@ export function useGameRoom() {
     }, 4000)
   }
 
-  function leaveRoom() {
+  async function leaveRoom() {
     diag.log('info', 'Leaving room')
     stopPeerPolling()
-    room?.leave()
+    const activeRoom = room
     room = null
     broadcastState = null
     sendAction = null
@@ -61,6 +62,9 @@ export function useGameRoom() {
     hostReady.value = false
     signalingWarning.value = ''
     store.reset()
+    if (activeRoom) {
+      await activeRoom.leave()
+    }
   }
 
   function setupChannel(isHostRole: boolean) {
@@ -74,13 +78,17 @@ export function useGameRoom() {
 
     diag.log('info', 'Setting up state/action channels', { isHostRole, hostPeerId })
 
-    const [broadcast, onReceive] = room.makeAction<GameState>('state')
-    const [send, onAction] = room.makeAction<GameAction>('action')
+    const stateChannel = room.makeAction<GameState>('state')
+    const actionChannel = room.makeAction<GameAction>('action')
 
-    broadcastState = (state, target) => broadcast(state, target ?? undefined)
-    sendAction = (action, target) => send(action, target ?? undefined)
+    broadcastState = (state, target) => {
+      void stateChannel.send(state, target ? { target } : undefined)
+    }
+    sendAction = (action, target) => {
+      void actionChannel.send(action, target ? { target } : undefined)
+    }
 
-    onReceive((state, fromPeerId) => {
+    stateChannel.onMessage = (state, { peerId: fromPeerId }) => {
       if (isHostRole) return
       if (fromPeerId !== hostPeerId) {
         diag.log('warn', 'Ignored state from unexpected peer', { fromPeerId, expected: hostPeerId })
@@ -91,16 +99,16 @@ export function useGameRoom() {
         playerCount: state.players.length,
       })
       store.applyState(state)
-    })
+    }
 
-    onAction((action, fromPeerId) => {
+    actionChannel.onMessage = (action, { peerId: fromPeerId }) => {
       if (!isHostRole) return
       if (fromPeerId === store.peerId) return
 
       diag.log('info', 'Host received guest action', { type: action.type, fromPeerId })
       const newState = store.dispatch(action)
       if (newState) broadcastState?.(newState)
-    })
+    }
 
     room.onPeerJoin((joinedPeerId) => {
       if (joinedPeerId === store.peerId) return
@@ -213,27 +221,40 @@ export function useGameRoom() {
         : 'Could not join the host room. Check the invite link and try again.'
       signalingWarning.value = message
       diag.log('error', message, err)
+      if (room) {
+        const failedRoom = room
+        room = null
+        broadcastState = null
+        sendAction = null
+        void failedRoom.leave()
+      }
+      store.connected = false
       return false
     }
   }
 
-  function startHost(code: string): boolean {
+  async function startHost(code: string): Promise<boolean> {
     if (import.meta.server) return false
 
     diag.log('info', 'Starting host session', { code, selfId })
-    leaveRoom()
+    await leaveRoom()
 
     hostPeerId = selfId
-    hostReady.value = true
     store.setPeerId(selfId)
     store.initAsHost(code, selfId)
 
     const ok = connectToRoom(code, selfId, true)
-    if (ok) startPeerPolling('Host listening')
+    if (ok) {
+      hostReady.value = true
+      startPeerPolling('Host listening')
+    } else {
+      store.reset()
+      hostPeerId = null
+    }
     return ok
   }
 
-  function joinHost(code: string, expectedHostPeerId: string): boolean {
+  async function joinHost(code: string, expectedHostPeerId: string): Promise<boolean> {
     if (import.meta.server) return false
 
     diag.log('info', 'Guest joining host session', {
@@ -247,7 +268,7 @@ export function useGameRoom() {
       return false
     }
 
-    leaveRoom()
+    await leaveRoom()
 
     hostPeerId = expectedHostPeerId
     hostReady.value = false
@@ -282,7 +303,9 @@ export function useGameRoom() {
     diag.log(ready ? 'success' : 'warn', `hostReady → ${ready}`)
   })
 
-  onUnmounted(() => leaveRoom())
+  onUnmounted(() => {
+    void leaveRoom()
+  })
 
   return {
     startHost,
@@ -295,4 +318,4 @@ export function useGameRoom() {
     signalingWarning,
     selfId: computed(() => selfId),
   }
-}
+})
