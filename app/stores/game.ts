@@ -190,6 +190,13 @@ export const useGameStore = defineStore('game', () => {
     state.value = createInitialState(code, hostId)
   }
 
+  function reset() {
+    state.value = null
+    peerId.value = ''
+    connected.value = false
+    peerCount.value = 0
+  }
+
   return {
     state,
     peerId,
