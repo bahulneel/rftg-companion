@@ -27,7 +27,12 @@ const connectionError = ref('')
 
 const joinUrl = computed(() => {
   if (props.mode !== 'host' || !selfId.value) return ''
-  return buildJoinUrl(props.code, selfId.value, config.app.baseURL)
+  return buildJoinUrl(
+    props.code,
+    selfId.value,
+    config.app.baseURL,
+    config.public.siteUrl as string,
+  )
 })
 
 onMounted(async () => {

@@ -1,22 +1,40 @@
 <script setup lang="ts">
-import { generateRoomCode, parseJoinUrl } from '~/utils/room'
+import { generateRoomCode, parseHostRoomQuery, parseJoinQuery, parseJoinUrl } from '~/utils/room'
 
+const route = useRoute()
 const router = useRouter()
 const inviteUrl = ref('')
 
+const joinParams = computed(() => parseJoinQuery(route.query))
+const hostRoomCode = computed(() => parseHostRoomQuery(route.query))
+
 function createGame() {
-  router.push(`/host/${generateRoomCode()}`)
+  router.push({ path: '/', query: { room: generateRoomCode() } })
 }
 
 function joinFromInvite() {
   const parsed = parseJoinUrl(inviteUrl.value)
   if (!parsed) return
-  router.push(`/join/${parsed.code}?host=${encodeURIComponent(parsed.hostPeerId)}`)
+  router.push({
+    path: '/',
+    query: { join: parsed.code, host: parsed.hostPeerId },
+  })
 }
 </script>
 
 <template>
-  <div class="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
+  <GameSession
+    v-if="joinParams"
+    mode="guest"
+    :code="joinParams.code"
+    :host-peer-id="joinParams.hostPeerId"
+  />
+  <GameSession
+    v-else-if="hostRoomCode"
+    mode="host"
+    :code="hostRoomCode"
+  />
+  <div v-else class="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
     <div class="w-full max-w-sm space-y-8 text-center">
       <div>
         <div class="mb-2 text-5xl">🌌</div>
@@ -28,7 +46,7 @@ function joinFromInvite() {
 
       <p class="text-sm leading-relaxed text-slate-400">
         The host creates a game on their phone and shares a QR code.
-        The host shares a QR code; players scan it to connect to the host device — no game server involved.
+        Players scan it to connect to the host device — no game server involved.
       </p>
 
       <button
@@ -52,7 +70,7 @@ function joinFromInvite() {
         <input
           v-model="inviteUrl"
           type="url"
-          placeholder="https://…/join/ABCD?host=…"
+          placeholder="https://…/?join=ABCD&host=…"
           class="w-full rounded-xl border border-space-600 bg-space-800 px-4 py-3 text-sm text-slate-100 placeholder:text-slate-600 focus:border-nebula-400 focus:outline-none"
         />
 

@@ -45,8 +45,8 @@ NUXT_APP_BASE_URL=/rftg-companion/ npm run generate
 This app uses a **host-centric WebRTC star topology** — no game server exists.
 
 1. **Host** taps Create Game and their browser becomes the authoritative peer
-2. A **QR code / invite link** is generated containing the host's WebRTC peer ID
-3. **Guests** scan the QR (or paste the link) to connect directly to the host device
+2. A **QR code / invite link** is generated (`?join=ROOM&host=PEER`) containing the host's WebRTC peer ID
+3. **Guests** scan the QR (or paste the link) to connect directly to the host device — links use query params so GitHub Pages can serve the app
 4. All game state lives on the host; guests send actions to the host peer only
 
 Trystero is used solely to complete the WebRTC handshake (NAT traversal). Once connected, game data flows directly between devices. If the host closes their browser tab, the game session ends.
