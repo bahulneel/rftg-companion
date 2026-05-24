@@ -1,16 +1,19 @@
 <script setup lang="ts">
 import type { Expansions, PhaseId, ScoreInput } from '~/types/game'
 import { rankPlayers } from '~/utils/scoring'
-import { getJoinUrl, isValidRoomCode } from '~/utils/room'
+import { buildJoinUrl, isValidRoomCode } from '~/utils/room'
+
+const props = defineProps<{
+  mode: 'host' | 'guest'
+  code: string
+  hostPeerId?: string
+}>()
 
 const route = useRoute()
 const router = useRouter()
+const config = useRuntimeConfig()
 const store = useGameStore()
-const { playerId } = usePlayerId()
-const { join, clientAction } = useGameRoom()
-
-const code = computed(() => String(route.params.code).toUpperCase())
-const isHostParam = computed(() => route.query.host === '1')
+const { startHost, joinHost, clientAction, hostReady, selfId } = useGameRoom()
 
 const playerName = ref('')
 const localSelections = ref<PhaseId[]>([])
@@ -20,28 +23,37 @@ const localExpansions = ref<Expansions>({
   prestige: false,
   goals: false,
 })
-const joining = ref(false)
+const connecting = ref(true)
 const connectionError = ref('')
 
-const config = useRuntimeConfig()
-const joinUrl = computed(() => getJoinUrl(code.value, config.app.baseURL))
+const joinUrl = computed(() => {
+  if (props.mode !== 'host' || !selfId.value) return ''
+  return buildJoinUrl(props.code, selfId.value, config.app.baseURL)
+})
 
 onMounted(async () => {
-  if (!isValidRoomCode(code.value)) {
+  if (!isValidRoomCode(props.code)) {
     router.replace('/')
     return
   }
 
-  store.setPeerId(playerId.value)
+  connecting.value = true
+  connectionError.value = ''
 
-  if (isHostParam.value) {
-    store.initAsHost(code.value, playerId.value)
-    await join(code.value, true)
-    clientAction({ type: 'JOIN', playerId: playerId.value, name: 'Host' })
-  } else {
-    joining.value = true
-    await join(code.value, false)
-    joining.value = false
+  try {
+    if (props.mode === 'host') {
+      await startHost(props.code)
+    } else {
+      if (!props.hostPeerId) {
+        connectionError.value = 'Missing host peer. Scan the host QR code to join.'
+        return
+      }
+      await joinHost(props.code, props.hostPeerId)
+    }
+  } catch {
+    connectionError.value = 'Failed to establish WebRTC connection.'
+  } finally {
+    connecting.value = false
   }
 })
 
@@ -55,9 +67,9 @@ watch(
 
 function handleSetName() {
   if (!playerName.value.trim()) return
-  clientAction({ type: 'SET_NAME', playerId: playerId.value, name: playerName.value.trim() })
-  if (!store.state?.players.some((p) => p.id === playerId.value)) {
-    clientAction({ type: 'JOIN', playerId: playerId.value, name: playerName.value.trim() })
+  clientAction({ type: 'SET_NAME', playerId: store.peerId, name: playerName.value.trim() })
+  if (!store.state?.players.some((p) => p.id === store.peerId)) {
+    clientAction({ type: 'JOIN', playerId: store.peerId, name: playerName.value.trim() })
   }
 }
 
@@ -75,11 +87,11 @@ function startGame() {
 
 function updateSelections(phases: PhaseId[]) {
   localSelections.value = phases
-  clientAction({ type: 'SELECT_PHASES', playerId: playerId.value, phases })
+  clientAction({ type: 'SELECT_PHASES', playerId: store.peerId, phases })
 }
 
 function confirmSelection() {
-  clientAction({ type: 'CONFIRM', playerId: playerId.value })
+  clientAction({ type: 'CONFIRM', playerId: store.peerId })
 }
 
 function nextRound() {
@@ -95,12 +107,12 @@ function endGame() {
 }
 
 function submitScore(score: Partial<ScoreInput>) {
-  clientAction({ type: 'SUBMIT_SCORE', playerId: playerId.value, score })
+  clientAction({ type: 'SUBMIT_SCORE', playerId: store.peerId, score })
 }
 
-const mySelections = computed(() => store.state?.selections[playerId.value] ?? localSelections.value)
-const isConfirmed = computed(() => store.state?.confirmed[playerId.value] ?? false)
-const showNameForm = computed(() => !store.me?.name || store.me.name === 'Host')
+const mySelections = computed(() => store.state?.selections[store.peerId] ?? localSelections.value)
+const isConfirmed = computed(() => store.state?.confirmed[store.peerId] ?? false)
+const showNameForm = computed(() => !store.me?.name)
 
 const ranked = computed(() => {
   if (!store.state) return []
@@ -112,40 +124,71 @@ const allScoresSubmitted = computed(() =>
 )
 
 watch(
-  () => store.state?.selections[playerId.value],
+  () => store.state?.selections[store.peerId],
   (sel) => {
     if (sel) localSelections.value = [...sel]
   },
 )
+
+async function copyInviteLink() {
+  if (!joinUrl.value) return
+  await navigator.clipboard.writeText(joinUrl.value)
+}
 </script>
 
 <template>
   <div class="mx-auto min-h-dvh max-w-lg px-4 py-6">
-    <!-- Connection status -->
-    <div v-if="!store.connected" class="text-center text-slate-400">
-      <p class="animate-pulse">Connecting via WebRTC...</p>
+    <div v-if="connecting" class="text-center text-slate-400">
+      <p class="animate-pulse">
+        {{ mode === 'host' ? 'Starting host peer...' : 'Connecting to host...' }}
+      </p>
     </div>
 
-    <div v-else-if="connectionError" class="text-center text-red-400">
-      {{ connectionError }}
+    <div v-else-if="connectionError" class="space-y-4 text-center">
+      <p class="text-red-400">{{ connectionError }}</p>
+      <NuxtLink to="/" class="text-sm text-nebula-300 hover:underline">← Back home</NuxtLink>
+    </div>
+
+    <div v-else-if="mode === 'guest' && !hostReady && !store.state" class="space-y-4 text-center text-slate-400">
+      <p class="animate-pulse">Waiting for host peer...</p>
+      <p class="text-xs">The host must have the game open on their device.</p>
     </div>
 
     <template v-else-if="store.state">
-      <!-- Header -->
       <header class="mb-6 flex items-center justify-between">
         <NuxtLink to="/" class="text-sm text-slate-400 hover:text-slate-200">← Home</NuxtLink>
         <span class="font-mono text-sm tracking-widest text-star-400">{{ code }}</span>
         <span
           class="rounded-full px-2 py-0.5 text-xs"
-          :class="store.connected ? 'bg-phase-settle/20 text-phase-settle' : 'bg-red-500/20 text-red-400'"
+          :class="store.isHost ? 'bg-star-400/20 text-star-300' : 'bg-phase-settle/20 text-phase-settle'"
         >
-          {{ store.connected ? 'P2P' : 'Offline' }}
+          {{ store.isHost ? 'Hosting' : 'Connected' }}
         </span>
       </header>
 
       <!-- LOBBY -->
       <div v-if="store.state.screen === 'lobby'" class="space-y-6">
-        <RoomCodeDisplay v-if="store.isHost" :code="code" :join-url="joinUrl" />
+        <div v-if="store.isHost">
+          <RoomCodeDisplay
+            v-if="joinUrl"
+            :code="code"
+            :join-url="joinUrl"
+          />
+          <p v-else class="text-center text-sm text-slate-400 animate-pulse">
+            Preparing invite link...
+          </p>
+          <button
+            v-if="joinUrl"
+            type="button"
+            class="mt-3 w-full rounded-xl border border-space-600 py-2.5 text-sm text-slate-300 hover:border-nebula-400"
+            @click="copyInviteLink"
+          >
+            Copy invite link
+          </button>
+          <p class="mt-2 text-center text-xs text-slate-500">
+            Players scan this QR to connect directly to your device.
+          </p>
+        </div>
 
         <div v-if="showNameForm" class="space-y-3">
           <label class="text-sm text-slate-400">Your Name</label>
@@ -163,7 +206,7 @@ watch(
             :disabled="!playerName.trim()"
             @click="handleSetName"
           >
-            Join Lobby
+            {{ store.isHost ? 'Join as Host' : 'Join Lobby' }}
           </button>
         </div>
 
@@ -181,15 +224,8 @@ watch(
           </ul>
         </div>
 
-        <ExpansionToggles
-          v-if="store.isHost"
-          v-model="localExpansions"
-        />
-        <ExpansionToggles
-          v-else
-          v-model="localExpansions"
-          disabled
-        />
+        <ExpansionToggles v-if="store.isHost" v-model="localExpansions" />
+        <ExpansionToggles v-else v-model="localExpansions" disabled />
 
         <button
           v-if="store.isHost"
@@ -221,14 +257,11 @@ watch(
           @confirm="confirmSelection"
         />
 
-        <PlayerStatusList
-          :players="store.state.players"
-          :my-id="playerId"
-        />
+        <PlayerStatusList :players="store.state.players" :my-id="store.peerId" />
 
         <VpTracker
           :players="store.state.players"
-          :my-id="playerId"
+          :my-id="store.peerId"
           :vp-pool="store.state.vpPool"
           :vp-pool-initial="store.state.vpPoolInitial"
           :last-round="store.state.lastRound"
@@ -249,7 +282,7 @@ watch(
 
         <VpTracker
           :players="store.state.players"
-          :my-id="playerId"
+          :my-id="store.peerId"
           :vp-pool="store.state.vpPool"
           :vp-pool-initial="store.state.vpPoolInitial"
           :last-round="store.state.lastRound"
@@ -263,9 +296,9 @@ watch(
       <!-- SCORING -->
       <div v-else-if="store.state.screen === 'scoring'" class="space-y-6">
         <ScoreSheet
-          v-if="store.me && !store.state.scores[playerId]?.submitted"
+          v-if="store.me && !store.state.scores[store.peerId]?.submitted"
           :expansions="store.state.expansions"
-          :score="store.state.scores[playerId] ?? { vpChips: store.me.vpChips, cardFaceValue: 0, devBonuses: 0, prestigePoints: 0, goalPoints: 0, cardsInHand: 0, goodsOnWorlds: 0, submitted: false }"
+          :score="store.state.scores[store.peerId] ?? { vpChips: store.me.vpChips, cardFaceValue: 0, devBonuses: 0, prestigePoints: 0, goalPoints: 0, cardsInHand: 0, goodsOnWorlds: 0, submitted: false }"
           :player-name="store.me.name"
           :submitted="false"
           @submit="submitScore"
@@ -283,10 +316,5 @@ watch(
         </div>
       </div>
     </template>
-
-    <div v-else-if="joining || (!store.state && store.connected)" class="space-y-4 text-center text-slate-400">
-      <p class="animate-pulse">{{ joining ? `Joining room ${code}...` : 'Waiting for host...' }}</p>
-      <p v-if="!joining" class="text-xs">Make sure the host has created the game and is connected.</p>
-    </div>
   </div>
 </template>

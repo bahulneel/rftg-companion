@@ -42,9 +42,16 @@ NUXT_APP_BASE_URL=/rftg-companion/ npm run generate
 
 ## How multiplayer works
 
-Players connect peer-to-peer using WebRTC. Trystero handles signaling over decentralized relays (Nostr by default) — no custom server needed. The host's device acts as the authoritative game state source and broadcasts updates to all connected peers.
+This app uses a **host-centric WebRTC star topology** — no game server exists.
 
-> **Note:** WebRTC works best when all players are on the same Wi-Fi network. Cross-network play may require TURN configuration in Trystero for reliability.
+1. **Host** taps Create Game and their browser becomes the authoritative peer
+2. A **QR code / invite link** is generated containing the host's WebRTC peer ID
+3. **Guests** scan the QR (or paste the link) to connect directly to the host device
+4. All game state lives on the host; guests send actions to the host peer only
+
+Trystero is used solely to complete the WebRTC handshake (NAT traversal). Once connected, game data flows directly between devices. If the host closes their browser tab, the game session ends.
+
+> **Note:** WebRTC works best when all players are on the same Wi-Fi network.
 
 ## Expansions
 

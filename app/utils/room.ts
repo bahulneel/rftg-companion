@@ -16,10 +16,41 @@ export function isValidRoomCode(code: string): boolean {
   return /^[A-Z]{4}$/.test(code)
 }
 
-export function getJoinUrl(code: string, baseURL = '/'): string {
-  if (import.meta.client) {
-    const base = `${window.location.origin}${baseURL}`.replace(/\/+$/, '')
-    return `${base}/room/${code}`
+export interface JoinLinkParams {
+  code: string
+  hostPeerId: string
+}
+
+export function buildJoinUrl(code: string, hostPeerId: string, baseURL = '/'): string {
+  const base = `${getOrigin()}${normalizeBase(baseURL)}`
+  const params = new URLSearchParams({ host: hostPeerId })
+  return `${base}/join/${code}?${params.toString()}`
+}
+
+export function parseJoinUrl(url: string): JoinLinkParams | null {
+  try {
+    const parsed = new URL(url.trim())
+    const match = parsed.pathname.match(/\/join\/([A-Z]{4})\/?$/i)
+    if (!match) return null
+
+    const hostPeerId = parsed.searchParams.get('host') ?? parsed.searchParams.get('h')
+    if (!hostPeerId) return null
+
+    const code = match[1]!.toUpperCase()
+    if (!isValidRoomCode(code)) return null
+
+    return { code, hostPeerId }
+  } catch {
+    return null
   }
-  return `/room/${code}`
+}
+
+function getOrigin(): string {
+  if (import.meta.client) return window.location.origin
+  return ''
+}
+
+function normalizeBase(baseURL: string): string {
+  const trimmed = baseURL.replace(/\/+$/, '')
+  return trimmed === '' ? '' : trimmed
 }
