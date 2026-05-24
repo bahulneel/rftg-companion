@@ -202,5 +202,6 @@ export const useGameStore = defineStore('game', () => {
     applyState,
     dispatch,
     initAsHost,
+    reset,
   }
 })

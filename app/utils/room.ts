@@ -21,8 +21,19 @@ export interface JoinLinkParams {
   hostPeerId: string
 }
 
-export function buildJoinUrl(code: string, hostPeerId: string, baseURL = '/'): string {
-  const base = `${getOrigin()}${normalizeBase(baseURL)}`
+/** Trystero namespace scoped to one host session (avoids colliding 4-letter codes). */
+export function roomNamespace(code: string, hostPeerId: string): string {
+  return `${code.toUpperCase()}-${hostPeerId}`
+}
+
+export function buildJoinUrl(
+  code: string,
+  hostPeerId: string,
+  baseURL = '/',
+  siteUrl = '',
+): string {
+  const origin = (siteUrl || getOrigin()).replace(/\/+$/, '')
+  const base = `${origin}${normalizeBase(baseURL)}`
   const params = new URLSearchParams({ host: hostPeerId })
   return `${base}/join/${code}?${params.toString()}`
 }

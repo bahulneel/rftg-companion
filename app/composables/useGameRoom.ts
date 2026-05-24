@@ -1,8 +1,16 @@
 import { joinRoom, selfId } from 'trystero'
 import type { GameAction, GameState } from '~/types/game'
 import { useGameStore } from '~/stores/game'
+import { roomNamespace } from '~/utils/room'
 
 const APP_ID = 'rftg-companion-v1'
+
+const RTC_CONFIG: RTCConfiguration = {
+  iceServers: [
+    { urls: 'stun:stun.l.google.com:19302' },
+    { urls: 'stun:stun1.l.google.com:19302' },
+  ],
+}
 
 type TrysteroRoom = ReturnType<typeof joinRoom>
 
@@ -14,6 +22,7 @@ export function useGameRoom() {
   let hostPeerId: string | null = null
 
   const hostReady = ref(false)
+  const signalingWarning = ref('')
 
   function leaveRoom() {
     room?.leave()
@@ -22,8 +31,8 @@ export function useGameRoom() {
     sendAction = null
     hostPeerId = null
     hostReady.value = false
-    store.connected = false
-    store.peerCount = 0
+    signalingWarning.value = ''
+    store.reset()
   }
 
   function setupChannel(isHostRole: boolean) {
@@ -71,8 +80,50 @@ export function useGameRoom() {
     })
   }
 
-  async function startHost(code: string) {
-    if (import.meta.server) return
+  function connectToRoom(
+    code: string,
+    namespaceHostId: string,
+    isHostRole: boolean,
+    expectedHostPeerId?: string,
+  ): boolean {
+    const callbacks = expectedHostPeerId
+      ? {
+          onPeerHandshake(peerId: string) {
+            if (peerId !== expectedHostPeerId) {
+              throw new Error('Unexpected peer')
+            }
+          },
+          onJoinError() {
+            signalingWarning.value =
+              'Having trouble reaching the host. Make sure the host still has the game open.'
+          },
+        }
+      : {
+          onJoinError() {
+            signalingWarning.value =
+              'Signaling is limited — players may need to retry joining from the QR code.'
+          },
+        }
+
+    try {
+      room = joinRoom(
+        { appId: APP_ID, rtcConfig: RTC_CONFIG },
+        roomNamespace(code, namespaceHostId),
+        callbacks,
+      )
+      setupChannel(isHostRole)
+      store.connected = true
+      return true
+    } catch {
+      signalingWarning.value = isHostRole
+        ? 'Could not open the listening room. Refresh and try again.'
+        : 'Could not join the host room. Check the invite link and try again.'
+      return false
+    }
+  }
+
+  function startHost(code: string): boolean {
+    if (import.meta.server) return false
 
     leaveRoom()
 
@@ -81,13 +132,15 @@ export function useGameRoom() {
     store.setPeerId(selfId)
     store.initAsHost(code, selfId)
 
-    room = joinRoom({ appId: APP_ID }, code.toUpperCase())
-    setupChannel(true)
-    store.connected = true
+    return connectToRoom(code, selfId, true)
   }
 
-  async function joinHost(code: string, expectedHostPeerId: string) {
-    if (import.meta.server) return
+  function joinHost(code: string, expectedHostPeerId: string): boolean {
+    if (import.meta.server) return false
+
+    if (expectedHostPeerId === selfId) {
+      return false
+    }
 
     leaveRoom()
 
@@ -95,9 +148,7 @@ export function useGameRoom() {
     hostReady.value = false
     store.setPeerId(selfId)
 
-    room = joinRoom({ appId: APP_ID }, code.toUpperCase())
-    setupChannel(false)
-    store.connected = true
+    return connectToRoom(code, expectedHostPeerId, false, expectedHostPeerId)
   }
 
   function hostAction(action: GameAction) {
@@ -126,6 +177,7 @@ export function useGameRoom() {
     clientAction,
     hostPeerId: computed(() => hostPeerId),
     hostReady,
+    signalingWarning,
     selfId: computed(() => selfId),
   }
 }
