@@ -93,17 +93,17 @@ const sessionPaused = computed(
   () => !isLocal.value && connectionPhase.value === 'reconnecting',
 )
 
-const showConnectionBanner = computed(() => {
-  if (isLocal.value) return false
-  const phase = connectionPhase.value
-  return (
-    phase === 'connecting'
-    || phase === 'listening'
-    || phase === 'waiting-for-host'
-    || phase === 'reconnecting'
-    || phase === 'error'
-    || (phase === 'connected' && store.isHost && pendingLobbyPeers.value.length > 0)
-  )
+const connectionStatusHint = computed(() => {
+  if (sessionPaused.value) {
+    return store.isHost
+      ? 'A player disconnected — waiting for them to rejoin.'
+      : 'Host disconnected — keep this page open while reconnecting.'
+  }
+  if (connectionPhase.value === 'connected' && store.isHost && pendingLobbyPeers.value.length > 0) {
+    const pending = pendingLobbyPeers.value.length
+    return `${pending} connected device${pending === 1 ? '' : 's'} still joining the lobby.`
+  }
+  return ''
 })
 
 const connectionBadge = computed(() => {
@@ -242,23 +242,25 @@ async function copyInviteLink() {
     </div>
 
     <template v-else-if="store.state && gameScreen">
-      <ConnectionStatusBanner
-        v-if="showConnectionBanner"
-        :phase="connectionPhase"
-        :is-host="store.isHost"
-        :guest-count="store.peerCount"
-        :pending-count="pendingLobbyPeers.length"
-        :message="signalingWarning || connectionError"
-      />
-
       <div :class="{ 'pointer-events-none opacity-60': sessionPaused }">
-        <header class="mb-6 flex items-center justify-between">
+        <header
+          class="flex items-center justify-between"
+          :class="connectionStatusHint ? 'mb-2' : 'mb-6'"
+        >
           <NuxtLink to="/" class="text-sm text-slate-400 hover:text-slate-200">← Home</NuxtLink>
           <span class="font-mono text-sm tracking-widest text-star-400">{{ code }}</span>
           <span class="rounded-full px-2 py-0.5 text-xs" :class="connectionBadge.class">
             {{ connectionBadge.label }}
           </span>
         </header>
+
+        <p
+          v-if="connectionStatusHint"
+          class="mb-6 text-center text-xs"
+          :class="sessionPaused ? 'text-amber-300/90' : 'text-slate-500'"
+        >
+          {{ connectionStatusHint }}
+        </p>
 
         <div
           v-if="showHostLobbyDrawer && gameScreen !== 'lobby'"
