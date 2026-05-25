@@ -12,6 +12,7 @@ const router = useRouter()
 const config = useRuntimeConfig()
 const store = useGameStore()
 const isLocal = computed(() => props.mode === 'local')
+const isHostMode = computed(() => props.mode === 'host')
 
 const gameRoom = isLocal.value ? null : useGameRoom()
 const localSession = isLocal.value ? useLocalGameSession() : null
@@ -43,14 +44,24 @@ const controller = usePeerGameController({
   isLocal: isLocal.value,
 })
 
+const {
+  screen: gameScreen,
+  lobby,
+  select,
+  reveal,
+  scoring,
+  newPlayerName,
+} = controller
+
 const diag = useConnectionDiagnostics()
 const { toast } = useToast()
 
 const connecting = ref(true)
 const connectionError = ref('')
+const hostLobbyOpen = ref(false)
 
 const joinUrl = computed(() => {
-  if (props.mode !== 'host') return ''
+  if (!isHostMode.value) return ''
   const hostPeerId = selfId.value || store.peerId
   if (!hostPeerId) return ''
   return buildJoinUrl(
@@ -61,20 +72,20 @@ const joinUrl = computed(() => {
   )
 })
 
-const showHostLobbySetup = computed(
-  () =>
-    !isLocal.value
-    && props.mode === 'host'
-    && store.isHost
-    && controller.screen.value === 'lobby',
+const hostLobbyBadgeCount = computed(
+  () => store.playerCount + pendingLobbyPeers.value.length,
 )
 
-const guestWaitingForHost = computed(
+const guestAwaitingSession = computed(
   () =>
-    props.mode === 'guest'
-    && !hostReady.value
-    && !store.state
-    && connectionPhase.value === 'waiting-for-host',
+    isGuestMode.value
+    && !connecting.value
+    && !connectionError.value
+    && (!hostReady.value || !store.state),
+)
+
+const showHostLobbyDrawer = computed(
+  () => isHostMode.value && !!store.state && !isLocal.value,
 )
 
 const sessionPaused = computed(
@@ -103,9 +114,6 @@ const connectionBadge = computed(() => {
   }
   switch (connectionPhase.value) {
     case 'listening':
-      if (store.isHost && store.isSpectator) {
-        return { label: 'Host', class: 'bg-star-400/20 text-star-300' }
-      }
       return { label: 'Listening', class: 'bg-star-400/20 text-star-300' }
     case 'waiting-for-host':
       return { label: 'Connecting…', class: 'bg-amber-500/20 text-amber-300 animate-pulse' }
@@ -160,8 +168,6 @@ onMounted(async () => {
       if (!ok) {
         connectionError.value = 'Failed to start hosting. See connection log.'
         toast(connectionError.value, 'error')
-      } else {
-        controller.ensureRegistered()
       }
     } else {
       if (!props.hostPeerId) {
@@ -195,7 +201,7 @@ async function copyInviteLink() {
 </script>
 
 <template>
-  <div class="mx-auto min-h-dvh max-w-lg px-4 py-6">
+  <div class="mx-auto min-h-dvh max-w-lg px-4 pb-24 pt-6">
     <div v-if="connecting && isLocal" class="text-center text-slate-400">
       <p class="animate-pulse">Setting up pass-and-play...</p>
     </div>
@@ -220,18 +226,21 @@ async function copyInviteLink() {
       <NuxtLink to="/" class="text-sm text-nebula-300 hover:underline">← Back home</NuxtLink>
     </div>
 
-    <div v-else-if="guestWaitingForHost" class="space-y-4">
+    <div v-else-if="guestAwaitingSession" class="space-y-4">
       <ConnectionStatusBanner
         :phase="connectionPhase"
         :is-host="false"
         :message="signalingWarning"
       />
+      <p class="text-center text-sm text-slate-400 animate-pulse">
+        {{ hostReady ? 'Syncing game from host…' : 'Connecting to host…' }}
+      </p>
       <p class="text-center text-xs text-slate-500">
-        Open <span class="text-slate-400">Connection log</span> below to copy diagnostics.
+        Open <span class="text-slate-400">Connection log</span> below if this takes more than a few seconds.
       </p>
     </div>
 
-    <template v-else-if="store.state && controller.screen">
+    <template v-else-if="store.state && gameScreen">
       <ConnectionStatusBanner
         v-if="showConnectionBanner"
         :phase="connectionPhase"
@@ -250,51 +259,42 @@ async function copyInviteLink() {
           </span>
         </header>
 
-        <div v-if="showHostLobbySetup" class="mb-6 space-y-3">
-          <RoomCodeDisplay
-            v-if="joinUrl"
-            :code="code"
-            :join-url="joinUrl"
-          />
-          <p v-else class="text-center text-sm text-slate-400 animate-pulse">
-            Preparing invite link...
-          </p>
-          <button
-            v-if="joinUrl"
-            type="button"
-            class="w-full rounded-xl border border-space-600 py-2.5 text-sm text-slate-300 hover:border-nebula-400"
-            @click="copyInviteLink"
-          >
-            Copy invite link
-          </button>
-          <p class="text-center text-xs text-slate-500">
-            Players scan this QR to connect directly to your device.
-          </p>
-          <p
-            v-if="store.isSpectator"
-            class="rounded-lg border border-star-400/20 bg-star-400/5 px-3 py-2 text-center text-xs text-star-300/90"
-          >
-            You're running the session as host — add table players below or stay as game master only.
-          </p>
+        <div
+          v-if="showHostLobbyDrawer && gameScreen !== 'lobby'"
+          class="mb-6 rounded-xl border border-space-600 bg-space-800/30 px-4 py-3 text-center text-sm text-slate-400"
+        >
+          Open the numbered lobby button to share the QR code, choose how you want to join, or manage players.
         </div>
 
         <LobbyScreen
-          v-if="controller.screen === 'lobby'"
-          v-bind="controller.lobby"
+          v-if="gameScreen === 'lobby' && !showHostLobbyDrawer"
+          v-bind="lobby"
           :room-code="code"
           :pending-peer-ids="pendingLobbyPeers"
-          :new-player-name="controller.newPlayerName"
-          @update:new-player-name="controller.newPlayerName = $event"
+          :new-player-name="newPlayerName"
+          @update:new-player-name="newPlayerName = $event"
           @reorder="controller.reorderPlayers"
           @add-player="controller.addPlayer()"
           @register-as-spectator="controller.registerAsSpectator()"
+          @register-as-game-master="controller.registerAsGameMaster()"
+          @register-as-player-peer="controller.registerAsPlayerPeer()"
           @start-game="controller.startGame()"
           @update:expansions="controller.updateExpansions"
         />
 
+        <div
+          v-else-if="showHostLobbyDrawer && gameScreen === 'lobby'"
+          class="rounded-xl border border-space-600 bg-space-800/30 px-4 py-8 text-center text-sm text-slate-400"
+        >
+          <p class="font-medium text-slate-300">Host lobby ready</p>
+          <p class="mt-2">
+            Tap the numbered lobby button to share the QR code, choose how you want to join, and start the game.
+          </p>
+        </div>
+
         <SelectScreen
-          v-else-if="controller.screen === 'select'"
-          v-bind="controller.select"
+          v-else-if="gameScreen === 'select'"
+          v-bind="select"
           @ready="controller.handDeviceToPlayer()"
           @update-selections="controller.selectPhases"
           @confirm="controller.confirmSelection()"
@@ -304,8 +304,8 @@ async function copyInviteLink() {
         />
 
         <RevealPhaseScreen
-          v-else-if="controller.screen === 'reveal'"
-          v-bind="controller.reveal"
+          v-else-if="gameScreen === 'reveal'"
+          v-bind="reveal"
           @set-reveal-index="controller.setRevealIndex"
           @adjust-vp="controller.adjustVp"
           @set-vp="controller.setVp"
@@ -313,12 +313,32 @@ async function copyInviteLink() {
         />
 
         <ScoringScreen
-          v-else-if="controller.screen === 'scoring'"
-          v-bind="controller.scoring"
+          v-else-if="gameScreen === 'scoring'"
+          v-bind="scoring"
           @ready="controller.handDeviceToPlayer()"
           @submit-tiebreak="controller.submitTiebreak"
         />
       </div>
+
+      <HostLobbyDrawer
+        v-if="showHostLobbyDrawer"
+        v-model:open="hostLobbyOpen"
+        :badge-count="hostLobbyBadgeCount"
+        :room-code="code"
+        :join-url="joinUrl"
+        :pending-peer-ids="pendingLobbyPeers"
+        v-bind="lobby"
+        :new-player-name="newPlayerName"
+        @update:new-player-name="newPlayerName = $event"
+        @reorder="controller.reorderPlayers"
+        @add-player="controller.addPlayer()"
+        @register-as-spectator="controller.registerAsSpectator()"
+        @register-as-game-master="controller.registerAsGameMaster()"
+        @register-as-player-peer="controller.registerAsPlayerPeer()"
+        @start-game="controller.startGame()"
+        @update:expansions="controller.updateExpansions"
+        @copy-invite="copyInviteLink"
+      />
     </template>
 
     <ConnectionDiagnosticsDrawer />

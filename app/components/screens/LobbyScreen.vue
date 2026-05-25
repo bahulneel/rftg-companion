@@ -10,6 +10,9 @@ const props = defineProps<{
   isHost: boolean
   isRegistered: boolean
   isSpectator: boolean
+  showHostJoinChoice?: boolean
+  showGameMasterStatus?: boolean
+  canSwitchToPlayerPeer?: boolean
   canReorder: boolean
   canStartGame: boolean
   canManageRoster: boolean
@@ -25,6 +28,8 @@ const emit = defineEmits<{
   reorder: [playerIds: string[]]
   addPlayer: []
   registerAsSpectator: []
+  registerAsGameMaster: []
+  registerAsPlayerPeer: []
   startGame: []
   'update:expansions': [value: Expansions]
 }>()
@@ -43,7 +48,7 @@ const showWaiting = computed(
   () => props.isRegistered && !props.canStartGame && props.playerCount >= 2,
 )
 
-const showHint = computed(() => props.hint && !props.isHost)
+const showHint = computed(() => props.hint && !props.showHostJoinChoice)
 </script>
 
 <template>
@@ -55,6 +60,45 @@ const showHint = computed(() => props.hint && !props.isHost)
       {{ hint }}
     </div>
 
+    <div v-if="showHostJoinChoice" class="space-y-3">
+      <p class="text-center text-sm font-medium text-slate-200">How are you joining this session?</p>
+      <button
+        type="button"
+        class="w-full rounded-xl border border-star-400/30 bg-star-400/10 py-4 text-left px-4 transition hover:border-star-400/50"
+        @click="emit('registerAsGameMaster')"
+      >
+        <span class="block font-semibold text-star-300">Game master only</span>
+        <span class="mt-1 block text-xs text-slate-400">
+          Run the room, share the QR code, and adjust scores — no player seat.
+        </span>
+      </button>
+      <button
+        type="button"
+        class="w-full rounded-xl border border-nebula-400/30 bg-nebula-400/10 py-4 text-left px-4 transition hover:border-nebula-400/50"
+        @click="emit('registerAsPlayerPeer')"
+      >
+        <span class="block font-semibold text-nebula-300">Join with players at my table</span>
+        <span class="mt-1 block text-xs text-slate-400">
+          Pass-and-play on this device — add one or more players at your table.
+        </span>
+      </button>
+    </div>
+
+    <div
+      v-else-if="showGameMasterStatus"
+      class="rounded-lg border border-star-400/20 bg-star-400/5 px-4 py-3 text-center text-sm text-star-300/90"
+    >
+      You're running the session as game master.
+      <button
+        v-if="canSwitchToPlayerPeer"
+        type="button"
+        class="mt-2 block w-full text-xs text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-slate-200"
+        @click="emit('registerAsPlayerPeer')"
+      >
+        Join with players at my table instead
+      </button>
+    </div>
+
     <LobbyPlayerList
       v-if="showPlayerList"
       :players="players"
@@ -63,11 +107,11 @@ const showHint = computed(() => props.hint && !props.isHost)
       :peer-id="peerId"
       :reorderable="canReorder"
       :show-order="canReorder"
-      :show-host-row="isHost && isSpectator"
+      :show-host-row="isHost && isSpectator && !showHostJoinChoice"
       @reorder="emit('reorder', $event)"
     />
 
-    <div v-if="canManageRoster" class="space-y-3">
+    <div v-if="canManageRoster && !showHostJoinChoice" class="space-y-3">
       <label class="text-sm text-slate-400">Add player at your table</label>
       <input
         v-model="localName"
@@ -86,7 +130,7 @@ const showHint = computed(() => props.hint && !props.isHost)
         Add Player
       </button>
       <button
-        v-if="!isRegistered"
+        v-if="!isHost && !isRegistered"
         type="button"
         class="w-full rounded-xl border border-space-600 py-3 text-sm text-slate-300 hover:border-nebula-400"
         @click="emit('registerAsSpectator')"

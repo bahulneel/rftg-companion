@@ -52,6 +52,8 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
   })
   const draftSelections = ref<PhaseId[]>([])
   const newPlayerName = ref('')
+  /** Host-only: unset until they explicitly choose game master or table players. */
+  const hostJoinMode = ref<'unset' | 'gamemaster' | 'player'>('unset')
   let playerCounter = 0
   let restoringLocalPlayers = false
   let syncingExpansionsFromStore = false
@@ -98,6 +100,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
   function addPlayer(name?: string) {
     const trimmed = (name ?? newPlayerName.value).trim()
     if (!trimmed || !options.peerId.value) return
+    if (store.isHost && !options.isLocal && hostJoinMode.value !== 'player') return
     const playerId = nextPlayerId()
     dispatch({
       type: 'ADD_PLAYER',
@@ -106,17 +109,29 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
       name: trimmed,
     })
     newPlayerName.value = ''
+    if (store.isHost) hostJoinMode.value = 'player'
   }
 
-  function registerAsSpectator() {
-    if (!options.peerId.value) return
+  function registerPeer() {
+    if (!options.peerId.value || !store.state) return
+    if (store.state.registeredPeerIds.includes(options.peerId.value)) return
     dispatch({ type: 'REGISTER_PEER', peerId: options.peerId.value })
   }
 
-  function ensureRegistered() {
-    if (!store.state || !options.peerId.value) return
-    if (store.state.registeredPeerIds.includes(options.peerId.value)) return
-    registerAsSpectator()
+  function registerAsGameMaster() {
+    if (!options.peerId.value) return
+    hostJoinMode.value = 'gamemaster'
+    registerPeer()
+  }
+
+  function registerAsPlayerPeer() {
+    if (!options.peerId.value) return
+    hostJoinMode.value = 'player'
+    registerPeer()
+  }
+
+  function registerAsSpectator() {
+    registerPeer()
   }
 
   function reorderPlayers(playerIds: string[]) {
@@ -227,6 +242,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
 
   function restoreLocalPlayersFromStorage() {
     const saved = loadSavedLocalPlayers()
+    hostJoinMode.value = 'player'
     if (saved.length === 0) return
 
     restoringLocalPlayers = true
@@ -358,6 +374,18 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     return ownedTied ?? null
   })
 
+  watch(
+    () => [store.isRegistered, myOwnedPlayers.value.length] as const,
+    ([registered, ownedCount]) => {
+      if (!store.isHost || options.isLocal) return
+      if (ownedCount > 0) {
+        hostJoinMode.value = 'player'
+      } else if (registered && hostJoinMode.value === 'unset') {
+        hostJoinMode.value = 'gamemaster'
+      }
+    },
+  )
+
   const lobby = computed(() => ({
     players: store.state?.players ?? [],
     hostId: store.state?.hostId ?? '',
@@ -365,16 +393,24 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     isHost: store.isHost,
     isRegistered: store.isRegistered,
     isSpectator: store.isSpectator,
+    showHostJoinChoice: store.isHost && !options.isLocal && !store.isRegistered,
+    showGameMasterStatus: store.isHost && !options.isLocal && store.isRegistered && store.isSpectator && hostJoinMode.value === 'gamemaster',
+    canSwitchToPlayerPeer: store.isHost && !options.isLocal && store.isRegistered && store.isSpectator && hostJoinMode.value === 'gamemaster',
     canReorder: canReorder(store.isHost) || !!options.isLocal,
     canStartGame: store.isHost || !!options.isLocal,
-    canManageRoster: store.state?.screen === 'lobby',
+    canManageRoster: (() => {
+      if (store.state?.screen !== 'lobby') return false
+      if (options.isLocal) return true
+      if (store.isHost) return hostJoinMode.value === 'player' || myOwnedPlayers.value.length > 0
+      return true
+    })(),
     playerCount: store.playerCount,
     expansions: draftExpansions.value,
     expansionsEditable: store.isHost || !!options.isLocal,
     hint: options.isLocal
       ? 'Add everyone playing at this table, drag to set pass order, then start the game.'
       : store.isHost
-        ? 'Share the QR code. Each peer adds their table players or joins as a spectator.'
+        ? 'Choose how you want to join this session.'
         : 'Add players at your table, or continue as a spectator.',
   }))
 
@@ -451,7 +487,8 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     newPlayerName,
     addPlayer,
     registerAsSpectator,
-    ensureRegistered,
+    registerAsGameMaster,
+    registerAsPlayerPeer,
     reorderPlayers,
     startGame,
     updateExpansions,

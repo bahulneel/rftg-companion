@@ -13,7 +13,7 @@ const kindStyles: Record<ToastKind, string> = {
 
 <template>
   <div
-    class="pointer-events-none fixed inset-x-0 top-4 z-[100] flex flex-col items-center gap-2 px-4"
+    class="pointer-events-none fixed inset-x-0 bottom-20 z-30 flex flex-col items-center gap-2 px-4"
     aria-live="polite"
     aria-relevant="additions removals"
   >
@@ -48,7 +48,7 @@ const kindStyles: Record<ToastKind, string> = {
 .toast-enter-from,
 .toast-leave-to {
   opacity: 0;
-  transform: translateY(-0.75rem);
+  transform: translateY(0.75rem);
 }
 
 .toast-move {
