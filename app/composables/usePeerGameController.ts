@@ -52,7 +52,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
   })
   const draftSelections = ref<PhaseId[]>([])
   const newPlayerName = ref('')
-  /** Host-only: unset until they explicitly choose game master or table players. */
+  /** Host-only: unset until they explicitly choose game master or player seats on this device. */
   const hostJoinMode = ref<'unset' | 'gamemaster' | 'player'>('unset')
   let playerCounter = 0
   let restoringLocalPlayers = false
@@ -408,10 +408,10 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     expansions: draftExpansions.value,
     expansionsEditable: store.isHost || !!options.isLocal,
     hint: options.isLocal
-      ? 'Add everyone playing at this table, drag to set pass order, then start the game.'
+      ? 'Add every player at the table, drag to set turn order, then start the game.'
       : store.isHost
         ? 'Choose how you want to join this session.'
-        : 'Add players at your table, or continue as a spectator.',
+        : 'Add players on this device, or continue as a spectator.',
   }))
 
   const select = computed(() => ({

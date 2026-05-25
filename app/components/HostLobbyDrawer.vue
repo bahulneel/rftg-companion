@@ -98,7 +98,7 @@ function close() {
             Copy invite link
           </button>
           <p class="text-center text-xs text-slate-500">
-            Share the QR so peers can connect to your room.
+            Share the QR so others can connect their devices to the room.
           </p>
         </div>
 

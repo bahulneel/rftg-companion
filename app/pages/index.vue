@@ -67,8 +67,8 @@ function joinFromInvite() {
       </div>
 
       <p class="text-sm leading-relaxed text-slate-400">
-        The host creates a game on their phone and shares a QR code.
-        Players scan it to connect to the host device — no game server involved.
+        Everyone plays at one table. The host shares a QR code so others can connect their devices —
+        one device per player, or share a device between several.
       </p>
 
       <button
@@ -87,7 +87,7 @@ function joinFromInvite() {
         Play on One Device
       </button>
       <p class="text-xs text-slate-500">
-        Pass-and-play: take turns on a single phone or tablet. No Wi‑Fi pairing needed.
+        One device, several players: pass the phone between them. No Wi‑Fi pairing needed.
       </p>
 
       <div class="space-y-3">

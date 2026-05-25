@@ -81,7 +81,7 @@ function isOwnPlayer(player: Player): boolean {
       </span>
     </h2>
     <p v-if="preview" class="mb-3 text-xs text-slate-500">
-      Peers are connecting — add your table players below.
+      Peers are connecting — add players on this device below.
     </p>
     <p v-else-if="reorderable" class="mb-3 text-xs text-slate-500">
       Drag to set turn order — first player picks phases first each round.
@@ -122,7 +122,7 @@ function isOwnPlayer(player: Player): boolean {
           {{ index + 1 }}
         </span>
         <span class="min-w-0 flex-1 truncate font-medium text-slate-100">{{ player.name }}</span>
-        <span v-if="isOwnPlayer(player)" class="shrink-0 text-xs text-nebula-400">Your table</span>
+        <span v-if="isOwnPlayer(player)" class="shrink-0 text-xs text-nebula-400">This device</span>
       </li>
       <li
         v-for="(pendingId, index) in pendingPeerIds"

@@ -77,9 +77,9 @@ const showHint = computed(() => props.hint && !props.showHostJoinChoice)
         class="w-full rounded-xl border border-nebula-400/30 bg-nebula-400/10 py-4 text-left px-4 transition hover:border-nebula-400/50"
         @click="emit('registerAsPlayerPeer')"
       >
-        <span class="block font-semibold text-nebula-300">Join with players at my table</span>
+        <span class="block font-semibold text-nebula-300">Join as a player on this device</span>
         <span class="mt-1 block text-xs text-slate-400">
-          Pass-and-play on this device — add one or more players at your table.
+          One device can cover several seats — pass it around the table to use fewer phones.
         </span>
       </button>
     </div>
@@ -95,7 +95,7 @@ const showHint = computed(() => props.hint && !props.showHostJoinChoice)
         class="mt-2 block w-full text-xs text-slate-400 underline decoration-slate-600 underline-offset-2 hover:text-slate-200"
         @click="emit('registerAsPlayerPeer')"
       >
-        Join with players at my table instead
+        Join as a player on this device instead
       </button>
     </div>
 
@@ -112,7 +112,7 @@ const showHint = computed(() => props.hint && !props.showHostJoinChoice)
     />
 
     <div v-if="canManageRoster && !showHostJoinChoice" class="space-y-3">
-      <label class="text-sm text-slate-400">Add player at your table</label>
+      <label class="text-sm text-slate-400">Add player on this device</label>
       <input
         v-model="localName"
         type="text"
