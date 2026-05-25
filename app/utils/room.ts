@@ -114,6 +114,18 @@ export function parseHostRoomQuery(
   return isValidRoomCode(code) ? code : null
 }
 
+export function parseLocalRoomQuery(
+  search: URLSearchParams | string | Record<string, unknown>,
+): string | null {
+  const params = toSearchParams(search)
+
+  const rawCode = params.get('local')
+  if (!rawCode) return null
+
+  const code = normalizeRoomCode(rawCode)
+  return isValidRoomCode(code) ? code : null
+}
+
 function getOrigin(): string {
   if (import.meta.client) return window.location.origin
   return ''

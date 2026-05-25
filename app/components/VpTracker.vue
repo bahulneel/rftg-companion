@@ -9,6 +9,8 @@ const props = defineProps<{
   lastRound: boolean
   gameEnded: boolean
   isHost: boolean
+  /** Single-device mode: adjust any player's vault from the player list */
+  localMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -80,7 +82,7 @@ const poolPercent = computed(() =>
         </div>
 
         <!-- Personal vault -->
-        <div class="mb-4 rounded-xl border border-nebula-400/30 bg-nebula-400/10 p-4">
+        <div v-if="!localMode" class="mb-4 rounded-xl border border-nebula-400/30 bg-nebula-400/10 p-4">
           <p class="text-sm text-slate-400">Your VP Vault</p>
           <div class="mt-2 flex items-center justify-center gap-6">
             <button
@@ -114,7 +116,26 @@ const poolPercent = computed(() =>
             <span :class="player.id === myId ? 'text-nebula-300 font-medium' : 'text-slate-300'">
               {{ player.name }}
             </span>
-            <span class="font-semibold text-star-400">{{ player.vpChips }} VP</span>
+            <div v-if="localMode" class="flex items-center gap-2">
+              <button
+                type="button"
+                class="flex h-8 w-8 items-center justify-center rounded-full bg-space-700 text-lg font-bold hover:bg-space-600 disabled:opacity-40"
+                :disabled="player.vpChips <= 0"
+                @click="emit('adjustVp', player.id, -1)"
+              >
+                −
+              </button>
+              <span class="min-w-[2rem] text-center font-semibold text-star-400">{{ player.vpChips }}</span>
+              <button
+                type="button"
+                class="flex h-8 w-8 items-center justify-center rounded-full bg-nebula-400 text-lg font-bold text-space-950 hover:bg-nebula-300 disabled:opacity-40"
+                :disabled="vpPool <= 0"
+                @click="emit('adjustVp', player.id, 1)"
+              >
+                +
+              </button>
+            </div>
+            <span v-else class="font-semibold text-star-400">{{ player.vpChips }} VP</span>
           </div>
         </div>
 

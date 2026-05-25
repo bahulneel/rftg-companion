@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { generateRoomCode, parseHostRoomQuery, parseJoinQuery, parseJoinUrl } from '~/utils/room'
+import { generateRoomCode, parseHostRoomQuery, parseJoinQuery, parseJoinUrl, parseLocalRoomQuery } from '~/utils/room'
 
 const route = useRoute()
 const router = useRouter()
@@ -7,9 +7,14 @@ const inviteUrl = ref('')
 
 const joinParams = computed(() => parseJoinQuery(route.query))
 const hostRoomCode = computed(() => parseHostRoomQuery(route.query))
+const localRoomCode = computed(() => parseLocalRoomQuery(route.query))
 
 function createGame() {
   router.push({ path: '/', query: { room: generateRoomCode() } })
+}
+
+function playLocal() {
+  router.push({ path: '/', query: { local: generateRoomCode() } })
 }
 
 function joinFromInvite() {
@@ -34,6 +39,11 @@ function joinFromInvite() {
     mode="host"
     :code="hostRoomCode"
   />
+  <GameSession
+    v-else-if="localRoomCode"
+    mode="local"
+    :code="localRoomCode"
+  />
   <div v-else class="flex min-h-dvh flex-col items-center justify-center px-6 py-12">
     <div class="w-full max-w-sm space-y-8 text-center">
       <div>
@@ -56,6 +66,17 @@ function joinFromInvite() {
       >
         Create Game
       </button>
+
+      <button
+        type="button"
+        class="w-full rounded-2xl border border-space-600 py-4 text-lg font-semibold text-slate-200 transition hover:border-nebula-400 hover:text-nebula-300 active:scale-[0.98]"
+        @click="playLocal"
+      >
+        Play on One Device
+      </button>
+      <p class="text-xs text-slate-500">
+        Pass-and-play: take turns on a single phone or tablet. No Wi‑Fi pairing needed.
+      </p>
 
       <div class="space-y-3">
         <div class="relative">

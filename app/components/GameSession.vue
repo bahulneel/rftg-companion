@@ -1,10 +1,12 @@
 <script setup lang="ts">
-import type { Expansions, PhaseId, ScoreInput } from '~/types/game'
+import type { Expansions, GameAction, PhaseId, ScoreInput } from '~/types/game'
 import { rankPlayers } from '~/utils/scoring'
 import { buildJoinUrl, isValidRoomCode } from '~/utils/room'
 
+const LOCAL_HOST_ID = 'local-host'
+
 const props = defineProps<{
-  mode: 'host' | 'guest'
+  mode: 'host' | 'guest' | 'local'
   code: string
   hostPeerId?: string
 }>()
@@ -14,8 +16,19 @@ const config = useRuntimeConfig()
 const store = useGameStore()
 const { startHost, joinHost, clientAction, hostReady, signalingWarning, selfId } = useGameRoom()
 const diag = useConnectionDiagnostics()
+const {
+  passStep,
+  activePlayerId,
+  resetForPlayers,
+  handDeviceToPlayer,
+  finishPlayerTurn,
+} = usePassAndPlay()
+
+const isLocal = computed(() => props.mode === 'local')
 
 const playerName = ref('')
+const newPlayerName = ref('')
+let localPlayerCounter = 0
 const localSelections = ref<PhaseId[]>([])
 const localExpansions = ref<Expansions>({
   gatheringStorm: false,
@@ -36,6 +49,58 @@ const joinUrl = computed(() => {
   )
 })
 
+const activePlayer = computed(() =>
+  store.state?.players.find((p) => p.id === activePlayerId.value),
+)
+
+const passProgress = computed(() => {
+  if (!store.state) return ''
+  const total = store.state.players.length
+  if (store.state.screen === 'select') {
+    const done = store.state.players.filter((p) => store.state!.confirmed[p.id]).length
+    return `${done} of ${total} players locked in`
+  }
+  if (store.state.screen === 'scoring') {
+    const done = store.state.players.filter((p) => store.state!.scores[p.id]?.submitted).length
+    return `${done} of ${total} scores submitted`
+  }
+  return ''
+})
+
+function dispatchAction(action: GameAction) {
+  if (isLocal.value) {
+    store.dispatch(action)
+  } else {
+    clientAction(action)
+  }
+}
+
+function nextLocalPlayerId() {
+  localPlayerCounter += 1
+  return `local-player-${localPlayerCounter}`
+}
+
+function addLocalPlayer() {
+  const name = newPlayerName.value.trim()
+  if (!name) return
+  dispatchAction({ type: 'JOIN', playerId: nextLocalPlayerId(), name })
+  newPlayerName.value = ''
+}
+
+function syncPassAndPlay() {
+  if (!isLocal.value || !store.state) return
+
+  if (store.state.screen === 'select') {
+    resetForPlayers(store.state.players, (id) => store.state!.confirmed[id])
+    localSelections.value = []
+  } else if (store.state.screen === 'scoring') {
+    resetForPlayers(
+      store.state.players,
+      (id) => store.state!.scores[id]?.submitted ?? false,
+    )
+  }
+}
+
 onMounted(async () => {
   diag.log('info', 'GameSession mounted', {
     mode: props.mode,
@@ -55,7 +120,11 @@ onMounted(async () => {
   connectionError.value = ''
 
   try {
-    if (props.mode === 'host') {
+    if (props.mode === 'local') {
+      store.initAsHost(props.code, LOCAL_HOST_ID)
+      store.connected = true
+      diag.log('success', 'Local pass-and-play session started', { code: props.code })
+    } else if (props.mode === 'host') {
       const ok = await startHost(props.code)
       if (!ok) connectionError.value = 'Failed to start hosting. See connection log.'
     } else {
@@ -81,6 +150,11 @@ onMounted(async () => {
 })
 
 watch(
+  () => [store.state?.screen, store.state?.round] as const,
+  () => syncPassAndPlay(),
+)
+
+watch(
   () => store.state?.expansions,
   (exp) => {
     if (exp) localExpansions.value = { ...exp }
@@ -88,54 +162,93 @@ watch(
   { deep: true },
 )
 
+watch(
+  () => (isLocal.value ? activePlayerId.value : store.peerId),
+  (id) => {
+    if (!id) {
+      localSelections.value = []
+      return
+    }
+    const sel = store.state?.selections[id]
+    localSelections.value = sel ? [...sel] : []
+  },
+)
+
 function handleSetName() {
   if (!playerName.value.trim()) return
-  clientAction({ type: 'SET_NAME', playerId: store.peerId, name: playerName.value.trim() })
+  dispatchAction({ type: 'SET_NAME', playerId: store.peerId, name: playerName.value.trim() })
   if (!store.state?.players.some((p) => p.id === store.peerId)) {
-    clientAction({ type: 'JOIN', playerId: store.peerId, name: playerName.value.trim() })
+    dispatchAction({ type: 'JOIN', playerId: store.peerId, name: playerName.value.trim() })
   }
 }
 
 function handleExpansionsUpdate() {
-  if (store.isHost) {
-    clientAction({ type: 'SET_EXPANSIONS', expansions: { ...localExpansions.value } })
+  if (store.isHost || isLocal.value) {
+    dispatchAction({ type: 'SET_EXPANSIONS', expansions: { ...localExpansions.value } })
   }
 }
 
 watch(localExpansions, handleExpansionsUpdate, { deep: true })
 
 function startGame() {
-  clientAction({ type: 'START_GAME' })
+  dispatchAction({ type: 'START_GAME' })
 }
 
 function updateSelections(phases: PhaseId[]) {
   localSelections.value = phases
-  clientAction({ type: 'SELECT_PHASES', playerId: store.peerId, phases })
+  const playerId = isLocal.value ? activePlayerId.value : store.peerId
+  if (!playerId) return
+  dispatchAction({ type: 'SELECT_PHASES', playerId, phases })
 }
 
 function confirmSelection() {
-  clientAction({ type: 'CONFIRM', playerId: store.peerId })
+  const playerId = isLocal.value ? activePlayerId.value : store.peerId
+  if (!playerId) return
+  dispatchAction({ type: 'CONFIRM', playerId })
+  if (isLocal.value && store.state?.screen === 'select') {
+    finishPlayerTurn(store.state.players, (id) => store.state!.confirmed[id])
+    localSelections.value = []
+  }
 }
 
 function nextRound() {
-  clientAction({ type: 'NEXT_ROUND' })
+  dispatchAction({ type: 'NEXT_ROUND' })
 }
 
 function adjustVp(playerId: string, delta: number) {
-  clientAction({ type: 'ADJUST_VP', playerId, delta })
+  dispatchAction({ type: 'ADJUST_VP', playerId, delta })
 }
 
 function endGame() {
-  clientAction({ type: 'END_GAME' })
+  dispatchAction({ type: 'END_GAME' })
 }
 
 function submitScore(score: Partial<ScoreInput>) {
-  clientAction({ type: 'SUBMIT_SCORE', playerId: store.peerId, score })
+  const playerId = isLocal.value ? activePlayerId.value : store.peerId
+  if (!playerId) return
+  dispatchAction({ type: 'SUBMIT_SCORE', playerId, score })
+  if (isLocal.value && store.state?.screen === 'scoring') {
+    finishPlayerTurn(
+      store.state.players,
+      (id) => store.state!.scores[id]?.submitted ?? false,
+    )
+  }
 }
 
-const mySelections = computed(() => store.state?.selections[store.peerId] ?? localSelections.value)
-const isConfirmed = computed(() => store.state?.confirmed[store.peerId] ?? false)
-const showNameForm = computed(() => !store.me?.name)
+const mySelections = computed(() => {
+  if (isLocal.value && passStep.value === 'handoff') return []
+  const id = isLocal.value ? activePlayerId.value : store.peerId
+  if (!id) return localSelections.value
+  return store.state?.selections[id] ?? localSelections.value
+})
+
+const isConfirmed = computed(() => {
+  const id = isLocal.value ? activePlayerId.value : store.peerId
+  if (!id) return false
+  return store.state?.confirmed[id] ?? false
+})
+
+const showNameForm = computed(() => !isLocal.value && !store.me?.name)
 
 const ranked = computed(() => {
   if (!store.state) return []
@@ -146,12 +259,12 @@ const allScoresSubmitted = computed(() =>
   store.state?.players.every((p) => store.state?.scores[p.id]?.submitted) ?? false,
 )
 
-watch(
-  () => store.state?.selections[store.peerId],
-  (sel) => {
-    if (sel) localSelections.value = [...sel]
-  },
-)
+const activeScorePlayer = computed(() => {
+  if (!isLocal.value || !activePlayerId.value || !store.state) return null
+  const player = store.state.players.find((p) => p.id === activePlayerId.value)
+  if (!player || store.state.scores[activePlayerId.value]?.submitted) return null
+  return player
+})
 
 watch(joinUrl, (url) => {
   if (url) diag.log('success', 'Host invite link ready', { joinUrl: url })
@@ -177,7 +290,13 @@ async function copyInviteLink() {
   <div class="mx-auto min-h-dvh max-w-lg px-4 py-6">
     <div v-if="connecting" class="text-center text-slate-400">
       <p class="animate-pulse">
-        {{ mode === 'host' ? 'Starting host peer...' : 'Connecting to host...' }}
+        {{
+          mode === 'local'
+            ? 'Setting up pass-and-play...'
+            : mode === 'host'
+              ? 'Starting host peer...'
+              : 'Connecting to host...'
+        }}
       </p>
     </div>
 
@@ -201,15 +320,25 @@ async function copyInviteLink() {
         <span class="font-mono text-sm tracking-widest text-star-400">{{ code }}</span>
         <span
           class="rounded-full px-2 py-0.5 text-xs"
-          :class="store.isHost ? 'bg-star-400/20 text-star-300' : 'bg-phase-settle/20 text-phase-settle'"
+          :class="
+            isLocal
+              ? 'bg-phase-explore/20 text-phase-explore'
+              : store.isHost
+                ? 'bg-star-400/20 text-star-300'
+                : 'bg-phase-settle/20 text-phase-settle'
+          "
         >
-          {{ store.isHost ? 'Hosting' : 'Connected' }}
+          {{ isLocal ? 'Pass & Play' : store.isHost ? 'Hosting' : 'Connected' }}
         </span>
       </header>
 
       <!-- LOBBY -->
       <div v-if="store.state.screen === 'lobby'" class="space-y-6">
-        <div v-if="store.isHost">
+        <div v-if="isLocal" class="rounded-xl border border-space-600 bg-space-800/30 px-4 py-3 text-center text-sm text-slate-400">
+          Add everyone playing at this table, then start the game. You'll pass the device for hidden phase picks.
+        </div>
+
+        <div v-else-if="store.isHost">
           <RoomCodeDisplay
             v-if="joinUrl"
             :code="code"
@@ -231,7 +360,27 @@ async function copyInviteLink() {
           </p>
         </div>
 
-        <div v-if="showNameForm" class="space-y-3">
+        <div v-if="isLocal" class="space-y-3">
+          <label class="text-sm text-slate-400">Add player</label>
+          <input
+            v-model="newPlayerName"
+            type="text"
+            maxlength="20"
+            placeholder="Player name"
+            class="w-full rounded-xl border border-space-600 bg-space-800 px-4 py-3 text-slate-100 focus:border-nebula-400 focus:outline-none"
+            @keyup.enter="addLocalPlayer"
+          />
+          <button
+            type="button"
+            class="w-full rounded-xl bg-nebula-400 py-3 font-semibold text-space-950"
+            :disabled="!newPlayerName.trim()"
+            @click="addLocalPlayer"
+          >
+            Add Player
+          </button>
+        </div>
+
+        <div v-else-if="showNameForm" class="space-y-3">
           <label class="text-sm text-slate-400">Your Name</label>
           <input
             v-model="playerName"
@@ -251,7 +400,7 @@ async function copyInviteLink() {
           </button>
         </div>
 
-        <div v-if="store.me && !showNameForm">
+        <div v-if="(isLocal || (store.me && !showNameForm)) && store.state.players.length">
           <h2 class="mb-3 text-lg font-semibold">Players ({{ store.playerCount }})</h2>
           <ul class="space-y-2">
             <li
@@ -260,16 +409,16 @@ async function copyInviteLink() {
               class="flex items-center justify-between rounded-lg bg-space-800/50 px-4 py-2"
             >
               <span>{{ player.name }}</span>
-              <span v-if="player.id === store.state.hostId" class="text-xs text-star-400">Host</span>
+              <span v-if="!isLocal && player.id === store.state.hostId" class="text-xs text-star-400">Host</span>
             </li>
           </ul>
         </div>
 
-        <ExpansionToggles v-if="store.isHost" v-model="localExpansions" />
+        <ExpansionToggles v-if="store.isHost || isLocal" v-model="localExpansions" />
         <ExpansionToggles v-else v-model="localExpansions" disabled />
 
         <button
-          v-if="store.isHost"
+          v-if="store.isHost || isLocal"
           type="button"
           class="w-full rounded-xl bg-phase-settle py-4 text-lg font-bold text-space-950 disabled:opacity-40"
           :disabled="store.playerCount < 2"
@@ -289,18 +438,45 @@ async function copyInviteLink() {
           <h2 class="text-xl font-bold">Phase Selection</h2>
         </div>
 
-        <PhasePicker
-          :expansions="store.state.expansions"
-          :player-count="store.playerCount"
-          :selected="mySelections"
-          :locked="isConfirmed"
-          @update="updateSelections"
-          @confirm="confirmSelection"
+        <PassDevicePrompt
+          v-if="isLocal && passStep === 'handoff' && activePlayer"
+          :player-name="activePlayer.name"
+          subtitle="Pass the device to"
+          :progress="passProgress"
+          @ready="handDeviceToPlayer"
         />
 
-        <PlayerStatusList :players="store.state.players" :my-id="store.peerId" />
+        <template v-else-if="!isLocal || passStep === 'playing'">
+          <PhasePicker
+            :expansions="store.state.expansions"
+            :player-count="store.playerCount"
+            :selected="mySelections"
+            :locked="isConfirmed"
+            @update="updateSelections"
+            @confirm="confirmSelection"
+          />
+
+          <VpTracker
+            v-if="isLocal && activePlayerId"
+            :players="store.state.players"
+            :my-id="activePlayerId"
+            :vp-pool="store.state.vpPool"
+            :vp-pool-initial="store.state.vpPoolInitial"
+            :last-round="store.state.lastRound"
+            :game-ended="store.state.gameEnded"
+            :is-host="true"
+            @adjust-vp="adjustVp"
+            @end-game="endGame"
+          />
+        </template>
+
+        <PlayerStatusList
+          :players="store.state.players"
+          :my-id="isLocal ? (activePlayerId ?? '') : store.peerId"
+        />
 
         <VpTracker
+          v-if="!isLocal"
           :players="store.state.players"
           :my-id="store.peerId"
           :vp-pool="store.state.vpPool"
@@ -323,12 +499,13 @@ async function copyInviteLink() {
 
         <VpTracker
           :players="store.state.players"
-          :my-id="store.peerId"
+          :my-id="isLocal ? '' : store.peerId"
           :vp-pool="store.state.vpPool"
           :vp-pool-initial="store.state.vpPoolInitial"
           :last-round="store.state.lastRound"
           :game-ended="store.state.gameEnded"
-          :is-host="store.isHost"
+          :is-host="store.isHost || isLocal"
+          :local-mode="isLocal"
           @adjust-vp="adjustVp"
           @end-game="endGame"
         />
@@ -336,8 +513,25 @@ async function copyInviteLink() {
 
       <!-- SCORING -->
       <div v-else-if="store.state.screen === 'scoring'" class="space-y-6">
+        <PassDevicePrompt
+          v-if="isLocal && passStep === 'handoff' && activePlayer && !allScoresSubmitted"
+          :player-name="activePlayer.name"
+          subtitle="Pass the device to"
+          :progress="passProgress"
+          @ready="handDeviceToPlayer"
+        />
+
         <ScoreSheet
-          v-if="store.me && !store.state.scores[store.peerId]?.submitted"
+          v-else-if="isLocal && passStep === 'playing' && activeScorePlayer"
+          :expansions="store.state.expansions"
+          :score="store.state.scores[activeScorePlayer.id] ?? { vpChips: activeScorePlayer.vpChips, cardFaceValue: 0, devBonuses: 0, prestigePoints: 0, goalPoints: 0, cardsInHand: 0, goodsOnWorlds: 0, submitted: false }"
+          :player-name="activeScorePlayer.name"
+          :submitted="false"
+          @submit="submitScore"
+        />
+
+        <ScoreSheet
+          v-else-if="!isLocal && store.me && !store.state.scores[store.peerId]?.submitted"
           :expansions="store.state.expansions"
           :score="store.state.scores[store.peerId] ?? { vpChips: store.me.vpChips, cardFaceValue: 0, devBonuses: 0, prestigePoints: 0, goalPoints: 0, cardsInHand: 0, goodsOnWorlds: 0, submitted: false }"
           :player-name="store.me.name"
@@ -351,7 +545,7 @@ async function copyInviteLink() {
             :ranked="ranked"
             :expansions="store.state.expansions"
           />
-          <p v-else class="text-center text-sm text-slate-400">
+          <p v-else-if="!isLocal" class="text-center text-sm text-slate-400">
             Waiting for all players to submit scores...
           </p>
         </div>
