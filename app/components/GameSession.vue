@@ -42,6 +42,7 @@ const localExpansions = ref<Expansions>({
 })
 const connecting = ref(true)
 const connectionError = ref('')
+const hostWantsPlayerSeat = ref(false)
 
 function expansionsEqual(a: Expansions, b: Expansions): boolean {
   return (
@@ -268,11 +269,21 @@ watch(
 )
 
 function handleSetName() {
+  if (store.isHost) return
   if (!playerName.value.trim()) return
   dispatchAction({ type: 'SET_NAME', playerId: store.peerId, name: playerName.value.trim() })
   if (!store.state?.players.some((p) => p.id === store.peerId)) {
     dispatchAction({ type: 'JOIN', playerId: store.peerId, name: playerName.value.trim() })
   }
+}
+
+function handleJoinAsPlayer() {
+  if (!store.isHost || store.isPlayer) return
+  if (!playerName.value.trim()) return
+  dispatchAction({ type: 'JOIN', playerId: store.peerId, name: playerName.value.trim() })
+  playerName.value = ''
+  hostWantsPlayerSeat.value = false
+  toast('You joined the game as a player', 'success')
 }
 
 function handleExpansionsUpdate() {
@@ -364,19 +375,29 @@ const isConfirmed = computed(() => {
   return store.state?.confirmed[id] ?? false
 })
 
-const showNameForm = computed(() => !isLocal.value && !store.me?.name)
+const showGuestNameForm = computed(
+  () => !isLocal.value && !store.isHost && !store.me,
+)
+
+const isGameMaster = computed(
+  () => !isLocal.value && store.isHost && !store.isPlayer,
+)
+
+const hasLobbyActivity = computed(
+  () =>
+    (store.state?.players.length ?? 0) > 0 || pendingLobbyPeers.value.length > 0,
+)
 
 const showLobbyPlayerList = computed(() => {
   if (!store.state || store.state.screen !== 'lobby') return false
   if (isLocal.value) return store.state.players.length > 0
-  if (store.isHost) {
-    return store.state.players.length > 0 || pendingLobbyPeers.value.length > 0
-  }
-  return !!(
-    store.me
-    && !showNameForm.value
-    && (store.state.players.length > 0 || pendingLobbyPeers.value.length > 0)
-  )
+  if (store.isHost) return true
+  return !!store.me
+})
+
+const playerListMyId = computed(() => {
+  if (isLocal.value) return activePlayerId.value ?? ''
+  return store.isPlayer ? store.peerId : ''
 })
 
 const ranked = computed(() => {
@@ -423,11 +444,28 @@ const connectionBadge = computed(() => {
   }
   switch (connectionPhase.value) {
     case 'listening':
+      if (store.isHost && !store.isPlayer) {
+        return { label: 'Game master', class: 'bg-star-400/20 text-star-300' }
+      }
       return { label: 'Listening', class: 'bg-star-400/20 text-star-300' }
     case 'waiting-for-host':
       return { label: 'Connecting…', class: 'bg-amber-500/20 text-amber-300 animate-pulse' }
     case 'connected':
       if (store.isHost) {
+        if (!store.isPlayer) {
+          const pending = pendingLobbyPeers.value.length
+          const joined = store.playerCount
+          if (pending > 0) {
+            return {
+              label: joined > 0 ? `GM · ${joined} joined · ${pending} connecting` : `GM · ${pending} connecting`,
+              class: 'bg-amber-500/20 text-amber-300',
+            }
+          }
+          return {
+            label: joined > 0 ? `Game master · ${joined} players` : 'Game master',
+            class: 'bg-star-400/20 text-star-300',
+          }
+        }
         const pending = pendingLobbyPeers.value.length
         const joined = store.playerCount
         if (pending > 0) {
@@ -573,7 +611,25 @@ async function copyInviteLink() {
           <p class="mt-2 text-center text-xs text-slate-500">
             Players scan this QR to connect directly to your device.
           </p>
+          <p
+            v-if="isGameMaster"
+            class="mt-3 rounded-lg border border-star-400/20 bg-star-400/5 px-3 py-2 text-center text-xs text-star-300/90"
+          >
+            You're the game master — run the session without taking a player seat.
+          </p>
         </div>
+
+        <LobbyPlayerList
+          v-if="showLobbyPlayerList"
+          :players="store.state.players"
+          :pending-peer-ids="pendingLobbyPeers"
+          :host-id="store.state.hostId"
+          :reorderable="isLocal || store.isHost"
+          :show-host-badge="store.isPlayer"
+          :show-order="isLocal || store.isHost"
+          :show-game-master="isGameMaster"
+          @reorder="reorderPlayers"
+        />
 
         <div v-if="isLocal" class="space-y-3">
           <label class="text-sm text-slate-400">Add player</label>
@@ -595,7 +651,7 @@ async function copyInviteLink() {
           </button>
         </div>
 
-        <div v-else-if="showNameForm" class="space-y-3">
+        <div v-else-if="showGuestNameForm" class="space-y-3">
           <label class="text-sm text-slate-400">Your Name</label>
           <input
             v-model="playerName"
@@ -611,20 +667,49 @@ async function copyInviteLink() {
             :disabled="!playerName.trim()"
             @click="handleSetName"
           >
-            {{ store.isHost ? 'Join as Host' : 'Join Lobby' }}
+            Join Lobby
           </button>
         </div>
 
-        <LobbyPlayerList
-          v-if="showLobbyPlayerList"
-          :players="store.state.players"
-          :pending-peer-ids="pendingLobbyPeers"
-          :host-id="store.state.hostId"
-          :reorderable="isLocal || store.isHost"
-          :show-host-badge="!isLocal"
-          :show-order="isLocal || store.isHost"
-          @reorder="reorderPlayers"
-        />
+        <div
+          v-else-if="isGameMaster && !hostWantsPlayerSeat"
+          class="text-center"
+        >
+          <button
+            type="button"
+            class="text-sm text-slate-500 underline decoration-slate-600 underline-offset-2 hover:text-slate-300"
+            @click="hostWantsPlayerSeat = true"
+          >
+            Join as a player instead
+          </button>
+        </div>
+
+        <div v-else-if="isGameMaster && hostWantsPlayerSeat" class="space-y-3">
+          <label class="text-sm text-slate-400">Your Name (optional player seat)</label>
+          <input
+            v-model="playerName"
+            type="text"
+            maxlength="20"
+            placeholder="Enter your name"
+            class="w-full rounded-xl border border-space-600 bg-space-800 px-4 py-3 text-slate-100 focus:border-nebula-400 focus:outline-none"
+            @keyup.enter="handleJoinAsPlayer"
+          />
+          <button
+            type="button"
+            class="w-full rounded-xl bg-nebula-400 py-3 font-semibold text-space-950"
+            :disabled="!playerName.trim()"
+            @click="handleJoinAsPlayer"
+          >
+            Join as Player
+          </button>
+          <button
+            type="button"
+            class="w-full text-sm text-slate-500 hover:text-slate-300"
+            @click="hostWantsPlayerSeat = false"
+          >
+            Stay as game master only
+          </button>
+        </div>
 
         <ExpansionToggles v-if="store.isHost || isLocal" v-model="localExpansions" />
         <ExpansionToggles v-else v-model="localExpansions" disabled />
@@ -658,6 +743,16 @@ async function copyInviteLink() {
           @ready="handDeviceToPlayer"
         />
 
+        <div
+          v-else-if="isGameMaster"
+          class="rounded-xl border border-star-400/20 bg-star-400/5 px-4 py-6 text-center"
+        >
+          <p class="text-sm font-medium text-star-300">Game master view</p>
+          <p class="mt-2 text-sm text-slate-400">
+            Waiting for players to lock in their phase selections…
+          </p>
+        </div>
+
         <template v-else-if="!isLocal || passStep === 'playing'">
           <PhasePicker
             :expansions="store.state.expansions"
@@ -686,18 +781,19 @@ async function copyInviteLink() {
 
         <PlayerStatusList
           :players="store.state.players"
-          :my-id="isLocal ? (activePlayerId ?? '') : store.peerId"
+          :my-id="playerListMyId"
         />
 
         <VpTracker
           v-if="!isLocal"
           :players="store.state.players"
-          :my-id="store.peerId"
+          :my-id="playerListMyId"
           :vp-pool="store.state.vpPool"
           :vp-pool-initial="store.state.vpPoolInitial"
           :last-round="store.state.lastRound"
           :game-ended="store.state.gameEnded"
           :is-host="store.isHost"
+          :game-master-mode="isGameMaster"
           @adjust-vp="adjustVp"
           @set-vp="setVp"
           @end-game="endGame"
@@ -714,9 +810,10 @@ async function copyInviteLink() {
           :vp-pool="store.state.vpPool"
           :vp-pool-initial="store.state.vpPoolInitial"
           :last-round="store.state.lastRound"
-          :my-id="isLocal ? '' : store.peerId"
+          :my-id="playerListMyId"
           :local-mode="isLocal"
           :can-navigate="store.isHost || isLocal"
+          :game-master-mode="isGameMaster"
           @set-reveal-index="setRevealIndex"
           @adjust-vp="adjustVp"
           @set-vp="setVp"

@@ -14,6 +14,7 @@ const props = defineProps<{
   myId: string
   localMode: boolean
   canNavigate: boolean
+  gameMasterMode?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,7 +35,7 @@ const gameEndsAfterRound = computed(() =>
 )
 
 function canEditPlayer(playerId: string): boolean {
-  if (props.localMode) return true
+  if (props.localMode || props.gameMasterMode) return true
   return playerId === props.myId
 }
 

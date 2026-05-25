@@ -60,6 +60,7 @@ export const useGameStore = defineStore('game', () => {
 
   const isHost = computed(() => state.value?.hostId === peerId.value)
   const me = computed(() => state.value?.players.find((p) => p.id === peerId.value))
+  const isPlayer = computed(() => !!me.value)
   const playerCount = computed(() => state.value?.players.length ?? 0)
 
   function setPeerId(id: string) {
@@ -278,6 +279,7 @@ export const useGameStore = defineStore('game', () => {
     connected,
     peerCount,
     isHost,
+    isPlayer,
     me,
     playerCount,
     setPeerId,

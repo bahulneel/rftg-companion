@@ -9,6 +9,8 @@ const props = defineProps<{
   lastRound: boolean
   gameEnded: boolean
   isHost: boolean
+  /** Game master / host running the session without a player seat */
+  gameMasterMode?: boolean
   /** Single-device mode: adjust any player's vault from the player list */
   localMode?: boolean
 }>()
@@ -27,7 +29,7 @@ const poolPercent = computed(() =>
 )
 
 function canEditPlayer(playerId: string): boolean {
-  if (props.localMode) return true
+  if (props.localMode || props.gameMasterMode) return true
   return playerId === props.myId
 }
 </script>
@@ -41,7 +43,8 @@ function canEditPlayer(playerId: string): boolean {
       @click="open = !open"
     >
       <span class="text-star-400">◆</span>
-      <span class="text-sm font-semibold">VP: {{ me?.vpChips ?? 0 }}</span>
+      <span v-if="gameMasterMode" class="text-sm font-semibold text-star-300">GM</span>
+      <span v-else class="text-sm font-semibold">VP: {{ me?.vpChips ?? 0 }}</span>
       <span class="text-xs text-slate-400">Pool: {{ vpPool }}</span>
     </button>
 
