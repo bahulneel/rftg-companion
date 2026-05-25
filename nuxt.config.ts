@@ -11,6 +11,7 @@ export default defineNuxtConfig({
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
   components: [
+    '~/components',
     {
       path: '~/components/screens',
       pathPrefix: false,
