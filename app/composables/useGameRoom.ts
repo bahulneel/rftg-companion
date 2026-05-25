@@ -3,6 +3,7 @@ import { joinRoom, selfId } from 'trystero'
 import type { GameAction, GameState } from '~/types/game'
 import { useGameStore } from '~/stores/game'
 import { roomNamespace } from '~/utils/room'
+import { isAuthorized } from '~/utils/permissions'
 
 const APP_ID = 'rftg-companion-v1'
 
@@ -54,10 +55,10 @@ export const useGameRoom = createSharedComposable(() => {
     store.peerCount = connectedPeerIds.value.length
   }
 
-  /** WebRTC peers in the room who have not yet joined the lobby (no name). */
+  /** WebRTC peers in the room who have not yet registered in the lobby. */
   const pendingLobbyPeers = computed(() => {
-    const joined = new Set(store.state?.players.map((p) => p.id) ?? [])
-    return connectedPeerIds.value.filter((id) => !joined.has(id))
+    const registered = new Set(store.state?.registeredPeerIds ?? [])
+    return connectedPeerIds.value.filter((id) => !registered.has(id))
   })
 
   function setPhase(phase: ConnectionPhase) {
@@ -149,11 +150,18 @@ export const useGameRoom = createSharedComposable(() => {
       if (!isHostRole) return
       if (fromPeerId === store.peerId) return
 
+      if (!store.state || !isAuthorized(fromPeerId, action, store.state)) {
+        diag.log('warn', 'Host rejected guest action', { type: action.type, fromPeerId })
+        return
+      }
+
       diag.log('info', 'Host received guest action', { type: action.type, fromPeerId })
       const newState = store.dispatch(action)
       if (newState) {
-        if (action.type === 'JOIN') {
+        if (action.type === 'ADD_PLAYER') {
           toast(`${action.name} joined the lobby`, 'success')
+        } else if (action.type === 'REGISTER_PEER') {
+          toast('A peer joined the lobby', 'success')
         }
         broadcastState?.(newState)
       }
@@ -359,6 +367,10 @@ export const useGameRoom = createSharedComposable(() => {
   }
 
   function hostAction(action: GameAction) {
+    if (!store.state || !isAuthorized(store.peerId, action, store.state)) {
+      diag.log('warn', 'Host rejected own action', { type: action.type })
+      return
+    }
     const newState = store.dispatch(action)
     if (newState && store.isHost) {
       broadcastState?.(newState)

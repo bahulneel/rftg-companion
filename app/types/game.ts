@@ -22,6 +22,7 @@ export interface Expansions {
 
 export interface Player {
   id: string
+  ownerPeerId: string
   name: string
   vpChips: number
   status: 'thinking' | 'ready'
@@ -54,6 +55,7 @@ export interface GameState {
   hostId: string
   screen: GameScreen
   players: Player[]
+  registeredPeerIds: string[]
   expansions: Expansions
   round: number
   selections: Record<string, PhaseId[]>
@@ -69,7 +71,8 @@ export interface GameState {
 
 export type GameAction =
   | { type: 'SYNC_STATE'; state: GameState }
-  | { type: 'JOIN'; playerId: string; name: string }
+  | { type: 'REGISTER_PEER'; peerId: string }
+  | { type: 'ADD_PLAYER'; playerId: string; ownerPeerId: string; name: string }
   | { type: 'SET_NAME'; playerId: string; name: string }
   | { type: 'REORDER_PLAYERS'; playerIds: string[] }
   | { type: 'SET_EXPANSIONS'; expansions: Expansions }

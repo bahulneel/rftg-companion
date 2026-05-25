@@ -11,10 +11,9 @@ const props = defineProps<{
   vpPool: number
   vpPoolInitial: number
   lastRound: boolean
-  myId: string
-  localMode: boolean
+  highlightPlayerId: string
   canNavigate: boolean
-  gameMasterMode?: boolean
+  canEditPlayer: (playerId: string) => boolean
 }>()
 
 const emit = defineEmits<{
@@ -33,11 +32,6 @@ const totalVp = computed(() => totalPlayerVp(props.players))
 const gameEndsAfterRound = computed(() =>
   shouldEndGameAfterRound(props.players, props.vpPoolInitial),
 )
-
-function canEditPlayer(playerId: string): boolean {
-  if (props.localMode || props.gameMasterMode) return true
-  return playerId === props.myId
-}
 
 function goNext() {
   if (isLastPhase.value) {
@@ -83,7 +77,6 @@ function goNext() {
     </div>
 
     <template v-else>
-      <!-- Phase overview -->
       <div class="space-y-2">
         <p class="text-xs uppercase tracking-wide text-slate-400">All phases</p>
         <div class="flex gap-2 overflow-x-auto pb-1">
@@ -104,7 +97,6 @@ function goNext() {
         </div>
       </div>
 
-      <!-- Active phase -->
       <div
         v-if="currentPhase"
         class="rounded-xl border-2 p-4"
@@ -133,7 +125,6 @@ function goNext() {
         </div>
       </div>
 
-      <!-- Running totals -->
       <div class="space-y-2 rounded-xl border border-space-600 bg-space-800/30 p-4">
         <p class="text-xs uppercase tracking-wide text-slate-400">Current scores</p>
         <div
@@ -141,7 +132,9 @@ function goNext() {
           :key="player.id"
           class="flex items-center justify-between"
         >
-          <span :class="player.id === myId ? 'text-nebula-300 font-medium' : 'text-slate-300'">
+          <span
+            :class="player.id === highlightPlayerId ? 'text-nebula-300 font-medium' : 'text-slate-300'"
+          >
             {{ player.name }}
           </span>
           <EditableVpScore

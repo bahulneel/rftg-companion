@@ -5,10 +5,10 @@ const props = defineProps<{
   players: Player[]
   pendingPeerIds?: string[]
   hostId: string
+  peerId?: string
   reorderable: boolean
-  showHostBadge?: boolean
   showOrder?: boolean
-  showGameMaster?: boolean
+  showHostRow?: boolean
   preview?: boolean
 }>()
 
@@ -26,7 +26,7 @@ const overId = ref<string | null>(null)
 function reorder(sourceId: string, targetId: string) {
   if (sourceId === targetId) return
 
-  const ids = props.players.map((p) => p.id)
+  const ids = props.players.map((player) => player.id)
   const from = ids.indexOf(sourceId)
   const to = ids.indexOf(targetId)
   if (from < 0 || to < 0) return
@@ -63,14 +63,16 @@ function onDragEnd() {
   dragId.value = null
   overId.value = null
 }
+
+function isOwnPlayer(player: Player): boolean {
+  return !!props.peerId && player.ownerPeerId === props.peerId
+}
 </script>
 
 <template>
   <div>
     <h2 class="mb-1 text-lg font-semibold">
-      <template v-if="showGameMaster">Lobby</template>
-      <template v-else>{{ preview ? 'Lobby activity' : 'Players' }}</template>
-      ({{ totalCount }})
+      {{ preview ? 'Lobby activity' : 'Players' }} ({{ totalCount }})
       <span
         v-if="pendingPeerIds.length"
         class="text-sm font-normal text-slate-500"
@@ -79,20 +81,20 @@ function onDragEnd() {
       </span>
     </h2>
     <p v-if="preview" class="mb-3 text-xs text-slate-500">
-      Players are connecting — enter your name below to join the lobby.
+      Peers are connecting — add your table players below.
     </p>
     <p v-else-if="reorderable" class="mb-3 text-xs text-slate-500">
       Drag to set turn order — first player picks phases first each round.
     </p>
     <ul class="space-y-2" role="list">
       <li
-        v-if="showGameMaster"
+        v-if="showHostRow"
         class="flex items-center gap-3 rounded-lg border border-star-400/20 bg-star-400/5 px-3 py-2"
       >
         <span class="w-5 shrink-0 text-center text-xs font-semibold text-star-400" aria-hidden="true">
           ★
         </span>
-        <span class="min-w-0 flex-1 font-medium text-star-300">Game master</span>
+        <span class="min-w-0 flex-1 font-medium text-star-300">Host (spectator)</span>
         <span class="shrink-0 text-xs text-star-400">You</span>
       </li>
       <li
@@ -120,13 +122,11 @@ function onDragEnd() {
           {{ index + 1 }}
         </span>
         <span class="min-w-0 flex-1 truncate font-medium text-slate-100">{{ player.name }}</span>
-        <span v-if="showHostBadge && player.id === hostId" class="shrink-0 text-xs text-star-400">
-          Host
-        </span>
+        <span v-if="isOwnPlayer(player)" class="shrink-0 text-xs text-nebula-400">Your table</span>
       </li>
       <li
-        v-for="(peerId, index) in pendingPeerIds"
-        :key="`pending-${peerId}`"
+        v-for="(pendingId, index) in pendingPeerIds"
+        :key="`pending-${pendingId}`"
         class="flex items-center gap-3 rounded-lg border border-dashed border-space-600 bg-space-800/30 px-3 py-2"
       >
         <span
@@ -136,10 +136,8 @@ function onDragEnd() {
           <span class="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
         </span>
         <span class="min-w-0 flex-1">
-          <span class="block font-medium text-slate-400">
-            Anonymous player {{ index + 1 }}
-          </span>
-          <span class="block text-xs text-slate-500">Connected — choosing name…</span>
+          <span class="block font-medium text-slate-400">Peer {{ index + 1 }}</span>
+          <span class="block text-xs text-slate-500">Connected — joining lobby…</span>
         </span>
         <span class="shrink-0 text-xs text-amber-400/80">Connecting</span>
       </li>

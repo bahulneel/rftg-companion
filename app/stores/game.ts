@@ -1,7 +1,8 @@
 import { toRaw } from 'vue'
 import { defineStore } from 'pinia'
-import type { Expansions, GameAction, GameState, PhaseId, ScoreInput } from '~/types/game'
+import type { Expansions, GameAction, GameState, PhaseId, Player, ScoreInput } from '~/types/game'
 import { buildRevealedPhases, getPhaseLimit } from '~/utils/phases'
+import { ownedPlayers } from '~/utils/permissions'
 import {
   applyVpTarget,
   defaultScoreInput,
@@ -27,12 +28,28 @@ function finishGameFromVp(s: GameState) {
   }
 }
 
+function addPlayerToState(s: GameState, playerId: string, ownerPeerId: string, name: string) {
+  if (s.players.some((player) => player.id === playerId)) return
+
+  s.players.push({
+    id: playerId,
+    ownerPeerId,
+    name: name.trim() || 'Player',
+    vpChips: 0,
+    status: 'thinking',
+  })
+  s.selections[playerId] = []
+  s.confirmed[playerId] = false
+  s.scores[playerId] = defaultScoreInput()
+}
+
 function createInitialState(code: string, hostId: string): GameState {
   return {
     code,
     hostId,
     screen: 'lobby',
     players: [],
+    registeredPeerIds: [],
     expansions: {
       gatheringStorm: false,
       rebelVsImperium: false,
@@ -59,9 +76,19 @@ export const useGameStore = defineStore('game', () => {
   const peerCount = ref(0)
 
   const isHost = computed(() => state.value?.hostId === peerId.value)
-  const me = computed(() => state.value?.players.find((p) => p.id === peerId.value))
-  const isPlayer = computed(() => !!me.value)
   const playerCount = computed(() => state.value?.players.length ?? 0)
+
+  const myPlayers = computed(() => {
+    if (!state.value || !peerId.value) return [] as Player[]
+    return ownedPlayers(state.value, peerId.value)
+  })
+
+  const isRegistered = computed(() => {
+    if (!state.value || !peerId.value) return false
+    return state.value.registeredPeerIds.includes(peerId.value)
+  })
+
+  const isSpectator = computed(() => isRegistered.value && myPlayers.value.length === 0)
 
   function setPeerId(id: string) {
     peerId.value = id
@@ -70,6 +97,11 @@ export const useGameStore = defineStore('game', () => {
   function applyState(newState: GameState) {
     state.value = {
       ...newState,
+      registeredPeerIds: newState.registeredPeerIds ?? [],
+      players: newState.players.map((player) => ({
+        ...player,
+        ownerPeerId: player.ownerPeerId ?? player.id,
+      })),
       revealPhaseIndex: newState.revealPhaseIndex ?? 0,
       scores: Object.fromEntries(
         Object.entries(newState.scores).map(([id, score]) => [
@@ -87,32 +119,34 @@ export const useGameStore = defineStore('game', () => {
 
     switch (action.type) {
       case 'SYNC_STATE':
-        state.value = action.state
+        state.value = {
+          ...action.state,
+          registeredPeerIds: action.state.registeredPeerIds ?? [],
+        }
         return action.state
 
-      case 'JOIN': {
-        if (s.players.some((p) => p.id === action.playerId)) break
-        s.players.push({
-          id: action.playerId,
-          name: action.name,
-          vpChips: 0,
-          status: 'thinking',
-        })
-        s.selections[action.playerId] = []
-        s.confirmed[action.playerId] = false
-        s.scores[action.playerId] = defaultScoreInput()
+      case 'REGISTER_PEER': {
+        if (s.registeredPeerIds.includes(action.peerId)) break
+        s.registeredPeerIds.push(action.peerId)
         break
       }
 
+      case 'ADD_PLAYER':
+        addPlayerToState(s, action.playerId, action.ownerPeerId, action.name)
+        if (!s.registeredPeerIds.includes(action.ownerPeerId)) {
+          s.registeredPeerIds.push(action.ownerPeerId)
+        }
+        break
+
       case 'SET_NAME': {
-        const player = s.players.find((p) => p.id === action.playerId)
+        const player = s.players.find((entry) => entry.id === action.playerId)
         if (player) player.name = action.name.trim() || 'Player'
         break
       }
 
       case 'REORDER_PLAYERS': {
         if (s.screen !== 'lobby') break
-        const byId = Object.fromEntries(s.players.map((p) => [p.id, p]))
+        const byId = Object.fromEntries(s.players.map((player) => [player.id, player]))
         const reordered = action.playerIds.map((id) => byId[id]).filter(Boolean)
         if (reordered.length !== s.players.length) break
         s.players = reordered
@@ -130,12 +164,12 @@ export const useGameStore = defineStore('game', () => {
         s.vpPool = s.vpPoolInitial
         s.lastRound = false
         s.gameEnded = false
-        for (const p of s.players) {
-          p.status = 'thinking'
-          p.vpChips = 0
-          s.selections[p.id] = []
-          s.confirmed[p.id] = false
-          s.scores[p.id] = defaultScoreInput()
+        for (const player of s.players) {
+          player.status = 'thinking'
+          player.vpChips = 0
+          s.selections[player.id] = []
+          s.confirmed[player.id] = false
+          s.scores[player.id] = defaultScoreInput()
         }
         break
       }
@@ -143,7 +177,7 @@ export const useGameStore = defineStore('game', () => {
       case 'SELECT_PHASES': {
         const limit = getPhaseLimit(s.players.length)
         s.selections[action.playerId] = action.phases.slice(0, limit)
-        const player = s.players.find((p) => p.id === action.playerId)
+        const player = s.players.find((entry) => entry.id === action.playerId)
         if (player && s.confirmed[action.playerId]) {
           player.status = 'thinking'
           s.confirmed[action.playerId] = false
@@ -157,12 +191,12 @@ export const useGameStore = defineStore('game', () => {
         if (sel.length !== limit) break
 
         s.confirmed[action.playerId] = true
-        const player = s.players.find((p) => p.id === action.playerId)
+        const player = s.players.find((entry) => entry.id === action.playerId)
         if (player) player.status = 'ready'
 
-        const allConfirmed = s.players.every((p) => s.confirmed[p.id])
+        const allConfirmed = s.players.every((entry) => s.confirmed[entry.id])
         if (allConfirmed) {
-          const names = Object.fromEntries(s.players.map((p) => [p.id, p.name]))
+          const names = Object.fromEntries(s.players.map((entry) => [entry.id, entry.name]))
           s.revealedPhases = buildRevealedPhases(s.selections, names)
           s.revealPhaseIndex = 0
           s.screen = 'reveal'
@@ -176,10 +210,10 @@ export const useGameStore = defineStore('game', () => {
         s.round += 1
         s.revealedPhases = []
         s.revealPhaseIndex = 0
-        for (const p of s.players) {
-          p.status = 'thinking'
-          s.selections[p.id] = []
-          s.confirmed[p.id] = false
+        for (const player of s.players) {
+          player.status = 'thinking'
+          s.selections[player.id] = []
+          s.confirmed[player.id] = false
         }
         break
       }
@@ -192,7 +226,7 @@ export const useGameStore = defineStore('game', () => {
       }
 
       case 'ADJUST_VP': {
-        const player = s.players.find((p) => p.id === action.playerId)
+        const player = s.players.find((entry) => entry.id === action.playerId)
         if (!player) break
         const result = applyVpTarget(
           player.vpChips,
@@ -211,7 +245,7 @@ export const useGameStore = defineStore('game', () => {
       }
 
       case 'SET_VP': {
-        const player = s.players.find((p) => p.id === action.playerId)
+        const player = s.players.find((entry) => entry.id === action.playerId)
         if (!player) break
         const result = applyVpTarget(
           player.vpChips,
@@ -250,7 +284,7 @@ export const useGameStore = defineStore('game', () => {
         s.scores[action.playerId] = {
           ...existing,
           ...action.score,
-          vpChips: s.players.find((p) => p.id === action.playerId)?.vpChips ?? existing.vpChips,
+          vpChips: s.players.find((entry) => entry.id === action.playerId)?.vpChips ?? existing.vpChips,
           submitted: true,
         }
         break
@@ -279,8 +313,9 @@ export const useGameStore = defineStore('game', () => {
     connected,
     peerCount,
     isHost,
-    isPlayer,
-    me,
+    myPlayers,
+    isRegistered,
+    isSpectator,
     playerCount,
     setPeerId,
     applyState,
