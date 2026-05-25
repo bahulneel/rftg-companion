@@ -10,6 +10,12 @@ export default defineNuxtConfig({
   ssr: false,
   devtools: { enabled: true },
   modules: ['@pinia/nuxt'],
+  components: [
+    {
+      path: '~/components/screens',
+      pathPrefix: false,
+    },
+  ],
   css: ['~/assets/css/main.css'],
   runtimeConfig: {
     public: {
