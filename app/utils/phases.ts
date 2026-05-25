@@ -1,4 +1,4 @@
-import type { Expansions, PhaseId } from '~/types/game'
+import type { Expansions, PhaseId, RevealedPhase, RevealedPhaseParticipant } from '~/types/game'
 
 export interface PhaseDefinition {
   id: PhaseId
@@ -36,7 +36,23 @@ export const PHASES: PhaseDefinition[] = [
     colorClass: 'bg-phase-develop/20 border-phase-develop text-phase-develop',
   },
   {
+    id: 'develop-2',
+    label: 'Develop',
+    shortLabel: 'Develop',
+    description: 'Play a diamond development card (−1 cost bonus)',
+    group: 'develop',
+    colorClass: 'bg-phase-develop/20 border-phase-develop text-phase-develop',
+  },
+  {
     id: 'settle',
+    label: 'Settle',
+    shortLabel: 'Settle',
+    description: 'Play a circle world card (−1 cost if military, or draw after if non-military)',
+    group: 'settle',
+    colorClass: 'bg-phase-settle/20 border-phase-settle text-phase-settle',
+  },
+  {
+    id: 'settle-2',
     label: 'Settle',
     shortLabel: 'Settle',
     description: 'Play a circle world card (−1 cost if military, or draw after if non-military)',
@@ -114,21 +130,61 @@ export function getPhaseById(id: PhaseId): PhaseDefinition {
   return phase
 }
 
+const DEVELOP_PHASE_IDS: PhaseId[] = ['develop', 'develop-2']
+const SETTLE_PHASE_IDS: PhaseId[] = ['settle', 'settle-2']
+
+function countPhasesInGroup(phases: PhaseId[], groupIds: PhaseId[]): number {
+  return phases.filter((id) => groupIds.includes(id)).length
+}
+
+/** Develop/settle stacks: N entries where N = max selections in that group across players. */
+function buildStackedGroupPhases(
+  groupIds: PhaseId[],
+  selections: Record<string, PhaseId[]>,
+  playerNames: Record<string, string>,
+): RevealedPhase[] {
+  const counts = Object.entries(selections).map(([playerId, phases]) => ({
+    id: playerId,
+    name: playerNames[playerId] ?? 'Unknown',
+    count: countPhasesInGroup(phases, groupIds),
+  }))
+  const maxCount = Math.max(0, ...counts.map((entry) => entry.count))
+  if (maxCount === 0) return []
+
+  return groupIds.slice(0, maxCount).map((id, index) => ({
+    id,
+    players: counts
+      .filter((entry) => entry.count >= index + 1)
+      .map((entry): RevealedPhaseParticipant => ({ id: entry.id, name: entry.name })),
+  }))
+}
+
 export function buildRevealedPhases(
   selections: Record<string, PhaseId[]>,
   playerNames: Record<string, string>,
-): { id: PhaseId; players: string[] }[] {
-  const phaseToPlayers = new Map<PhaseId, string[]>()
+): RevealedPhase[] {
+  const phaseToPlayers = new Map<PhaseId, RevealedPhaseParticipant[]>()
 
   for (const [playerId, phases] of Object.entries(selections)) {
     for (const phaseId of phases) {
+      if (DEVELOP_PHASE_IDS.includes(phaseId) || SETTLE_PHASE_IDS.includes(phaseId)) continue
       const existing = phaseToPlayers.get(phaseId) ?? []
-      existing.push(playerNames[playerId] ?? 'Unknown')
+      existing.push({ id: playerId, name: playerNames[playerId] ?? 'Unknown' })
       phaseToPlayers.set(phaseId, existing)
     }
   }
 
-  return PHASE_ORDER
-    .filter((id) => phaseToPlayers.has(id))
-    .map((id) => ({ id, players: phaseToPlayers.get(id)! }))
+  const revealed: RevealedPhase[] = []
+
+  for (const id of PHASE_ORDER) {
+    if (id === 'develop') {
+      revealed.push(...buildStackedGroupPhases(DEVELOP_PHASE_IDS, selections, playerNames))
+    } else if (id === 'settle') {
+      revealed.push(...buildStackedGroupPhases(SETTLE_PHASE_IDS, selections, playerNames))
+    } else if (phaseToPlayers.has(id)) {
+      revealed.push({ id, players: phaseToPlayers.get(id)! })
+    }
+  }
+
+  return revealed
 }

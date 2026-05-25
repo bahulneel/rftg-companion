@@ -1,7 +1,31 @@
+import { toRaw } from 'vue'
 import { defineStore } from 'pinia'
 import type { Expansions, GameAction, GameState, PhaseId, ScoreInput } from '~/types/game'
 import { buildRevealedPhases, getPhaseLimit } from '~/utils/phases'
-import { defaultScoreInput, vpPoolForPlayerCount } from '~/utils/scoring'
+import {
+  applyVpTarget,
+  defaultScoreInput,
+  vpPoolForPlayerCount,
+} from '~/utils/scoring'
+
+function syncScoreVp(s: GameState, playerId: string, vpChips: number) {
+  if (s.scores[playerId]) {
+    s.scores[playerId]!.vpChips = vpChips
+  }
+}
+
+function finishGameFromVp(s: GameState) {
+  s.gameEnded = true
+  s.screen = 'scoring'
+  for (const player of s.players) {
+    s.scores[player.id] = {
+      ...defaultScoreInput(player.vpChips),
+      vpChips: player.vpChips,
+      submitted: true,
+      tiebreakSubmitted: false,
+    }
+  }
+}
 
 function createInitialState(code: string, hostId: string): GameState {
   return {
@@ -19,6 +43,7 @@ function createInitialState(code: string, hostId: string): GameState {
     selections: {},
     confirmed: {},
     revealedPhases: [],
+    revealPhaseIndex: 0,
     vpPool: 0,
     vpPoolInitial: 0,
     lastRound: false,
@@ -42,13 +67,22 @@ export const useGameStore = defineStore('game', () => {
   }
 
   function applyState(newState: GameState) {
-    state.value = newState
+    state.value = {
+      ...newState,
+      revealPhaseIndex: newState.revealPhaseIndex ?? 0,
+      scores: Object.fromEntries(
+        Object.entries(newState.scores).map(([id, score]) => [
+          id,
+          { ...score, tiebreakSubmitted: score.tiebreakSubmitted ?? false },
+        ]),
+      ),
+    }
   }
 
   function dispatch(action: GameAction): GameState | null {
     if (!state.value) return null
 
-    const s = structuredClone(state.value)
+    const s = structuredClone(toRaw(state.value))
 
     switch (action.type) {
       case 'SYNC_STATE':
@@ -72,6 +106,15 @@ export const useGameStore = defineStore('game', () => {
       case 'SET_NAME': {
         const player = s.players.find((p) => p.id === action.playerId)
         if (player) player.name = action.name.trim() || 'Player'
+        break
+      }
+
+      case 'REORDER_PLAYERS': {
+        if (s.screen !== 'lobby') break
+        const byId = Object.fromEntries(s.players.map((p) => [p.id, p]))
+        const reordered = action.playerIds.map((id) => byId[id]).filter(Boolean)
+        if (reordered.length !== s.players.length) break
+        s.players = reordered
         break
       }
 
@@ -120,6 +163,7 @@ export const useGameStore = defineStore('game', () => {
         if (allConfirmed) {
           const names = Object.fromEntries(s.players.map((p) => [p.id, p.name]))
           s.revealedPhases = buildRevealedPhases(s.selections, names)
+          s.revealPhaseIndex = 0
           s.screen = 'reveal'
         }
         break
@@ -130,6 +174,7 @@ export const useGameStore = defineStore('game', () => {
         s.screen = 'select'
         s.round += 1
         s.revealedPhases = []
+        s.revealPhaseIndex = 0
         for (const p of s.players) {
           p.status = 'thinking'
           s.selections[p.id] = []
@@ -138,33 +183,63 @@ export const useGameStore = defineStore('game', () => {
         break
       }
 
+      case 'SET_REVEAL_INDEX': {
+        if (s.screen !== 'reveal') break
+        const maxIndex = Math.max(0, s.revealedPhases.length - 1)
+        s.revealPhaseIndex = Math.min(maxIndex, Math.max(0, action.index))
+        break
+      }
+
       case 'ADJUST_VP': {
         const player = s.players.find((p) => p.id === action.playerId)
         if (!player) break
-        const newVp = Math.max(0, player.vpChips + action.delta)
-        const actualDelta = newVp - player.vpChips
-        if (actualDelta > 0 && s.vpPool < actualDelta) break
+        const result = applyVpTarget(
+          player.vpChips,
+          player.vpChips + action.delta,
+          s.vpPool,
+          s.vpPoolInitial,
+          s.lastRound,
+        )
+        if (result.vpChips === player.vpChips && result.vpPool === s.vpPool) break
 
-        player.vpChips = newVp
-        s.vpPool = Math.max(0, s.vpPool - actualDelta)
+        player.vpChips = result.vpChips
+        s.vpPool = result.vpPool
+        s.lastRound = result.lastRound
+        syncScoreVp(s, action.playerId, player.vpChips)
+        break
+      }
 
-        if (s.scores[action.playerId]) {
-          s.scores[action.playerId]!.vpChips = newVp
-        }
+      case 'SET_VP': {
+        const player = s.players.find((p) => p.id === action.playerId)
+        if (!player) break
+        const result = applyVpTarget(
+          player.vpChips,
+          action.vpChips,
+          s.vpPool,
+          s.vpPoolInitial,
+          s.lastRound,
+        )
+        if (result.vpChips === player.vpChips && result.vpPool === s.vpPool) break
 
-        if (s.vpPool === 0 && !s.lastRound) {
-          s.lastRound = true
-        }
+        player.vpChips = result.vpChips
+        s.vpPool = result.vpPool
+        s.lastRound = result.lastRound
+        syncScoreVp(s, action.playerId, player.vpChips)
         break
       }
 
       case 'END_GAME': {
-        s.gameEnded = true
-        s.screen = 'scoring'
-        for (const p of s.players) {
-          if (s.scores[p.id]) {
-            s.scores[p.id]!.vpChips = p.vpChips
-          }
+        finishGameFromVp(s)
+        break
+      }
+
+      case 'SUBMIT_TIEBREAK': {
+        const existing = s.scores[action.playerId] ?? defaultScoreInput()
+        s.scores[action.playerId] = {
+          ...existing,
+          goodsOnWorlds: Math.max(0, Math.floor(action.goodsOnWorlds)),
+          cardsInHand: Math.max(0, Math.floor(action.cardsInHand)),
+          tiebreakSubmitted: true,
         }
         break
       }

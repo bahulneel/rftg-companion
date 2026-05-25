@@ -1,16 +1,22 @@
 <script setup lang="ts">
 import type { Expansions } from '~/types/game'
-import type { RankedPlayer } from '~/utils/scoring'
+import { buildTiebreakSummary, type RankedPlayer } from '~/utils/scoring'
 
-defineProps<{
+const props = defineProps<{
   ranked: RankedPlayer[]
   expansions: Expansions
 }>()
 
 const expanded = ref<string | null>(null)
 
+const tiebreakSummary = computed(() => buildTiebreakSummary(props.ranked))
+
 function toggle(id: string) {
   expanded.value = expanded.value === id ? null : id
+}
+
+function playerTiebreakNote(playerId: string): string | null {
+  return tiebreakSummary.value?.playerNotes[playerId] ?? null
 }
 
 const podiumColors = ['text-star-400', 'text-slate-300', 'text-phase-consume']
@@ -19,6 +25,14 @@ const podiumColors = ['text-star-400', 'text-slate-300', 'text-phase-consume']
 <template>
   <div class="space-y-4">
     <h2 class="text-center text-2xl font-bold text-slate-100">Final Standings</h2>
+
+    <div
+      v-if="tiebreakSummary"
+      class="rounded-xl border border-star-400/30 bg-star-400/10 p-4"
+    >
+      <p class="font-semibold text-star-300">{{ tiebreakSummary.headline }}</p>
+      <p class="mt-1 text-sm text-slate-400">{{ tiebreakSummary.detail }}</p>
+    </div>
 
     <!-- Podium top 3 -->
     <div class="flex items-end justify-center gap-3 py-4">
@@ -50,26 +64,42 @@ const podiumColors = ['text-star-400', 'text-slate-300', 'text-phase-consume']
         class="w-full rounded-xl border border-space-600 bg-space-800/50 p-4 text-left"
         @click="toggle(player.id)"
       >
-        <div class="flex items-center justify-between">
-          <div class="flex items-center gap-3">
-            <span class="flex h-8 w-8 items-center justify-center rounded-full bg-space-700 text-sm font-bold">
+        <div class="flex items-center justify-between gap-3">
+          <div class="flex min-w-0 items-center gap-3">
+            <span class="flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-space-700 text-sm font-bold">
               {{ player.rank }}
             </span>
-            <span class="font-semibold text-slate-100">{{ player.name }}</span>
+            <div class="min-w-0">
+              <span class="font-semibold text-slate-100">{{ player.name }}</span>
+              <p
+                v-if="playerTiebreakNote(player.id)"
+                class="mt-0.5 text-xs leading-snug"
+                :class="playerTiebreakNote(player.id)?.startsWith('Won')
+                  ? 'text-phase-settle'
+                  : playerTiebreakNote(player.id)?.startsWith('Shared')
+                    ? 'text-star-400'
+                    : 'text-slate-500'"
+              >
+                {{ playerTiebreakNote(player.id) }}
+              </p>
+            </div>
           </div>
-          <span class="text-xl font-bold text-star-400">{{ player.total }}</span>
+          <span class="shrink-0 text-xl font-bold text-star-400">{{ player.total }}</span>
         </div>
 
         <div v-if="expanded === player.id" class="mt-3 space-y-1 border-t border-space-600 pt-3 text-sm">
           <div class="flex justify-between text-slate-400">
             <span>VP Chips</span><span class="text-slate-200">{{ player.breakdown.vpChips }}</span>
           </div>
-          <div class="flex justify-between text-slate-400">
-            <span>Card Face Value</span><span class="text-slate-200">{{ player.breakdown.cardFaceValue }}</span>
-          </div>
-          <div class="flex justify-between text-slate-400">
-            <span>6-Cost Dev Bonuses</span><span class="text-slate-200">{{ player.breakdown.devBonuses }}</span>
-          </div>
+          <template v-if="player.breakdown.tiebreakSubmitted">
+            <p class="pt-1 text-xs uppercase tracking-wide text-slate-500">Tie-break counts</p>
+            <div class="flex justify-between text-slate-400">
+              <span>Goods on Worlds</span><span class="text-slate-200">{{ player.breakdown.goodsOnWorlds }}</span>
+            </div>
+            <div class="flex justify-between text-slate-400">
+              <span>Cards in Hand</span><span class="text-slate-200">{{ player.breakdown.cardsInHand }}</span>
+            </div>
+          </template>
           <div v-if="expansions.prestige" class="flex justify-between text-slate-400">
             <span>Prestige</span><span class="text-slate-200">{{ player.breakdown.prestigePoints }}</span>
           </div>

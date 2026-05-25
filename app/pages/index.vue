@@ -9,6 +9,15 @@ const joinParams = computed(() => parseJoinQuery(route.query))
 const hostRoomCode = computed(() => parseHostRoomQuery(route.query))
 const localRoomCode = computed(() => parseLocalRoomQuery(route.query))
 
+const sessionKey = computed(() => {
+  if (joinParams.value) {
+    return `guest-${joinParams.value.code}-${joinParams.value.hostPeerId}`
+  }
+  if (hostRoomCode.value) return `host-${hostRoomCode.value}`
+  if (localRoomCode.value) return `local-${localRoomCode.value}`
+  return null
+})
+
 function createGame() {
   router.push({ path: '/', query: { room: generateRoomCode() } })
 }
@@ -30,17 +39,20 @@ function joinFromInvite() {
 <template>
   <GameSession
     v-if="joinParams"
+    :key="sessionKey!"
     mode="guest"
     :code="joinParams.code"
     :host-peer-id="joinParams.hostPeerId"
   />
   <GameSession
     v-else-if="hostRoomCode"
+    :key="sessionKey!"
     mode="host"
     :code="hostRoomCode"
   />
   <GameSession
     v-else-if="localRoomCode"
+    :key="sessionKey!"
     mode="local"
     :code="localRoomCode"
   />

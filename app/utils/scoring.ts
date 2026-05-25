@@ -25,6 +25,7 @@ export function defaultScoreInput(vpChips = 0): ScoreInput {
     cardsInHand: 0,
     goodsOnWorlds: 0,
     submitted: false,
+    tiebreakSubmitted: false,
   }
 }
 
@@ -70,4 +71,160 @@ export function rankPlayers(
 
 export function vpPoolForPlayerCount(count: number): number {
   return count * 12
+}
+
+export function totalPlayerVp(players: Player[]): number {
+  return players.reduce((sum, player) => sum + player.vpChips, 0)
+}
+
+export function clampVpChips(value: number): number {
+  return Math.max(0, Math.floor(value))
+}
+
+/** Whether a ±1 VP change is allowed for this player. */
+export function canAdjustVp(current: number, delta: number): boolean {
+  return current + delta >= 0
+}
+
+export interface ApplyVpResult {
+  vpChips: number
+  vpPool: number
+  lastRound: boolean
+}
+
+/**
+ * Apply a target VP chip count.
+ * Gains are never blocked by an empty pool (RFTG adds reserve chips in the final round).
+ * The pool tracks chips still in supply; lastRound is set when it hits zero.
+ */
+export function applyVpTarget(
+  currentVp: number,
+  targetVp: number,
+  vpPool: number,
+  vpPoolInitial: number,
+  lastRound: boolean,
+): ApplyVpResult {
+  const clamped = clampVpChips(targetVp)
+  const delta = clamped - currentVp
+  if (delta === 0) {
+    return { vpChips: currentVp, vpPool, lastRound }
+  }
+
+  if (delta > 0) {
+    const fromPool = Math.min(delta, Math.max(0, vpPool))
+    const nextPool = vpPool - fromPool
+    return {
+      vpChips: clamped,
+      vpPool: nextPool,
+      lastRound: lastRound || nextPool === 0,
+    }
+  }
+
+  return {
+    vpChips: clamped,
+    vpPool: Math.min(vpPoolInitial, vpPool - delta),
+    lastRound,
+  }
+}
+
+/** Game ends after the round in which total VP scored exceeds the pool (not when equal). */
+export function shouldEndGameAfterRound(
+  players: Player[],
+  vpPoolInitial: number,
+): boolean {
+  return totalPlayerVp(players) > vpPoolInitial
+}
+
+/** Players tied for the highest score (VP total only — before tie-breakers resolve). */
+export function getVpTiedPlayerIds(
+  players: Player[],
+  scores: Record<string, ScoreInput>,
+  expansions: Expansions,
+): string[] {
+  if (players.length < 2) return []
+
+  const totals = players.map((player) => ({
+    id: player.id,
+    total: totalScore(scores[player.id] ?? defaultScoreInput(player.vpChips), expansions),
+  }))
+  const maxTotal = Math.max(...totals.map((entry) => entry.total))
+  const tied = totals.filter((entry) => entry.total === maxTotal).map((entry) => entry.id)
+  return tied.length >= 2 ? tied : []
+}
+
+export function needsTiebreakInput(
+  players: Player[],
+  scores: Record<string, ScoreInput>,
+  expansions: Expansions,
+): boolean {
+  const tiedIds = getVpTiedPlayerIds(players, scores, expansions)
+  if (tiedIds.length < 2) return false
+  return tiedIds.some((id) => !scores[id]?.tiebreakSubmitted)
+}
+
+export interface TiebreakSummary {
+  headline: string
+  detail: string
+  playerNotes: Record<string, string>
+}
+
+function winnerOverLoserReason(winner: ScoreInput, loser: ScoreInput): string {
+  if (winner.goodsOnWorlds !== loser.goodsOnWorlds) {
+    return `more goods on worlds (${winner.goodsOnWorlds} vs ${loser.goodsOnWorlds})`
+  }
+  return `more cards in hand (${winner.cardsInHand} vs ${loser.cardsInHand})`
+}
+
+function loserVsWinnerReason(loser: ScoreInput, winner: ScoreInput): string {
+  if (loser.goodsOnWorlds !== winner.goodsOnWorlds) {
+    return `fewer goods on worlds (${loser.goodsOnWorlds} vs ${winner.goodsOnWorlds})`
+  }
+  return `fewer cards in hand (${loser.cardsInHand} vs ${winner.cardsInHand})`
+}
+
+/** Human-readable explanation of how a VP tie was resolved. */
+export function buildTiebreakSummary(ranked: RankedPlayer[]): TiebreakSummary | null {
+  if (ranked.length < 2) return null
+
+  const topTotal = ranked[0]!.total
+  const leaders = ranked.filter((player) => player.total === topTotal)
+  if (leaders.length < 2) return null
+  if (!leaders.some((player) => player.breakdown.tiebreakSubmitted)) return null
+
+  const byTiebreak = [...leaders].sort((a, b) => compareTiebreak(a.breakdown, b.breakdown))
+  const best = byTiebreak[0]!.breakdown
+  const winners = byTiebreak.filter((player) => compareTiebreak(player.breakdown, best) === 0)
+  const playerNotes: Record<string, string> = {}
+
+  if (winners.length === leaders.length) {
+    return {
+      headline: 'Tie-break did not separate the leaders',
+      detail: `All leaders had ${best.goodsOnWorlds} goods on worlds and ${best.cardsInHand} cards in hand, so they share the win.`,
+      playerNotes: Object.fromEntries(
+        leaders.map((player) => [player.id, 'Shared win — tie-break was identical']),
+      ),
+    }
+  }
+
+  const topWinner = winners[0]!
+  const firstLoser = byTiebreak.find((player) => compareTiebreak(player.breakdown, best) !== 0)!
+  const decidingReason = winnerOverLoserReason(topWinner.breakdown, firstLoser.breakdown)
+
+  for (const player of leaders) {
+    if (compareTiebreak(player.breakdown, best) === 0) {
+      playerNotes[player.id] = `Won tie-break — ${decidingReason}`
+    } else {
+      playerNotes[player.id] = `Lost tie-break — ${loserVsWinnerReason(player.breakdown, topWinner.breakdown)}`
+    }
+  }
+
+  const headline = winners.length > 1
+    ? `${winners.map((player) => player.name).join(' & ')} win the tie-break`
+    : `${topWinner.name} wins the tie-break`
+
+  return {
+    headline,
+    detail: `Leaders were tied on ${topTotal} VP. Official tie-break is most goods on worlds, then most cards in hand — decided by ${decidingReason}.`,
+    playerNotes,
+  }
 }

@@ -2,7 +2,9 @@ export type PhaseId =
   | 'explore-11'
   | 'explore-vp5'
   | 'develop'
+  | 'develop-2'
   | 'settle'
+  | 'settle-2'
   | 'consume-trade'
   | 'consume-x2'
   | 'produce'
@@ -34,11 +36,17 @@ export interface ScoreInput {
   cardsInHand: number
   goodsOnWorlds: number
   submitted: boolean
+  tiebreakSubmitted: boolean
+}
+
+export interface RevealedPhaseParticipant {
+  id: string
+  name: string
 }
 
 export interface RevealedPhase {
   id: PhaseId
-  players: string[]
+  players: RevealedPhaseParticipant[]
 }
 
 export interface GameState {
@@ -51,6 +59,7 @@ export interface GameState {
   selections: Record<string, PhaseId[]>
   confirmed: Record<string, boolean>
   revealedPhases: RevealedPhase[]
+  revealPhaseIndex: number
   vpPool: number
   vpPoolInitial: number
   lastRound: boolean
@@ -62,11 +71,15 @@ export type GameAction =
   | { type: 'SYNC_STATE'; state: GameState }
   | { type: 'JOIN'; playerId: string; name: string }
   | { type: 'SET_NAME'; playerId: string; name: string }
+  | { type: 'REORDER_PLAYERS'; playerIds: string[] }
   | { type: 'SET_EXPANSIONS'; expansions: Expansions }
   | { type: 'START_GAME' }
   | { type: 'SELECT_PHASES'; playerId: string; phases: PhaseId[] }
   | { type: 'CONFIRM'; playerId: string }
   | { type: 'NEXT_ROUND' }
+  | { type: 'SET_REVEAL_INDEX'; index: number }
   | { type: 'ADJUST_VP'; playerId: string; delta: number }
+  | { type: 'SET_VP'; playerId: string; vpChips: number }
   | { type: 'END_GAME' }
+  | { type: 'SUBMIT_TIEBREAK'; playerId: string; goodsOnWorlds: number; cardsInHand: number }
   | { type: 'SUBMIT_SCORE'; playerId: string; score: Partial<ScoreInput> }

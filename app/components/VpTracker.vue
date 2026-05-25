@@ -15,6 +15,7 @@ const props = defineProps<{
 
 const emit = defineEmits<{
   adjustVp: [playerId: string, delta: number]
+  setVp: [playerId: string, value: number]
   endGame: []
 }>()
 
@@ -24,6 +25,11 @@ const me = computed(() => props.players.find((p) => p.id === props.myId))
 const poolPercent = computed(() =>
   props.vpPoolInitial > 0 ? (props.vpPool / props.vpPoolInitial) * 100 : 0,
 )
+
+function canEditPlayer(playerId: string): boolean {
+  if (props.localMode) return true
+  return playerId === props.myId
+}
 </script>
 
 <template>
@@ -44,7 +50,7 @@ const poolPercent = computed(() =>
       v-if="lastRound && !gameEnded"
       class="fixed top-0 inset-x-0 z-50 animate-pulse-glow bg-star-400 px-4 py-3 text-center font-bold text-space-950"
     >
-      ⚠ Last Round! Game ends after this round.
+      ⚠ Pool empty — game ends after a round where total VP exceeds the pool.
     </div>
 
     <!-- Drawer -->
@@ -82,26 +88,17 @@ const poolPercent = computed(() =>
         </div>
 
         <!-- Personal vault -->
-        <div v-if="!localMode" class="mb-4 rounded-xl border border-nebula-400/30 bg-nebula-400/10 p-4">
+        <div v-if="!localMode && me" class="mb-4 rounded-xl border border-nebula-400/30 bg-nebula-400/10 p-4">
           <p class="text-sm text-slate-400">Your VP Vault</p>
-          <div class="mt-2 flex items-center justify-center gap-6">
-            <button
-              type="button"
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-space-700 text-2xl font-bold hover:bg-space-600"
-              :disabled="!me || me.vpChips <= 0"
-              @click="emit('adjustVp', myId, -1)"
-            >
-              −
-            </button>
-            <span class="text-4xl font-bold text-nebula-300">{{ me?.vpChips ?? 0 }}</span>
-            <button
-              type="button"
-              class="flex h-12 w-12 items-center justify-center rounded-full bg-nebula-400 text-2xl font-bold text-space-950 hover:bg-nebula-300"
-              :disabled="vpPool <= 0"
-              @click="emit('adjustVp', myId, 1)"
-            >
-              +
-            </button>
+          <div class="mt-2 flex justify-center">
+            <EditableVpScore
+              :value="me.vpChips"
+              :vp-pool="vpPool"
+              :vp-pool-initial="vpPoolInitial"
+              :editable="true"
+              @adjust="emit('adjustVp', myId, $event)"
+              @set="emit('setVp', myId, $event)"
+            />
           </div>
         </div>
 
@@ -116,25 +113,16 @@ const poolPercent = computed(() =>
             <span :class="player.id === myId ? 'text-nebula-300 font-medium' : 'text-slate-300'">
               {{ player.name }}
             </span>
-            <div v-if="localMode" class="flex items-center gap-2">
-              <button
-                type="button"
-                class="flex h-8 w-8 items-center justify-center rounded-full bg-space-700 text-lg font-bold hover:bg-space-600 disabled:opacity-40"
-                :disabled="player.vpChips <= 0"
-                @click="emit('adjustVp', player.id, -1)"
-              >
-                −
-              </button>
-              <span class="min-w-[2rem] text-center font-semibold text-star-400">{{ player.vpChips }}</span>
-              <button
-                type="button"
-                class="flex h-8 w-8 items-center justify-center rounded-full bg-nebula-400 text-lg font-bold text-space-950 hover:bg-nebula-300 disabled:opacity-40"
-                :disabled="vpPool <= 0"
-                @click="emit('adjustVp', player.id, 1)"
-              >
-                +
-              </button>
-            </div>
+            <EditableVpScore
+              v-if="canEditPlayer(player.id)"
+              :value="player.vpChips"
+              :vp-pool="vpPool"
+              :vp-pool-initial="vpPoolInitial"
+              :editable="true"
+              compact
+              @adjust="emit('adjustVp', player.id, $event)"
+              @set="emit('setVp', player.id, $event)"
+            />
             <span v-else class="font-semibold text-star-400">{{ player.vpChips }} VP</span>
           </div>
         </div>
@@ -145,7 +133,7 @@ const poolPercent = computed(() =>
           class="mt-4 w-full rounded-xl border border-phase-consume/50 py-3 text-sm font-semibold text-phase-consume hover:bg-phase-consume/10"
           @click="emit('endGame')"
         >
-          End Game & Open Score Sheet
+          End Game & Show Standings
         </button>
       </div>
     </Transition>

@@ -1,13 +1,50 @@
 <script setup lang="ts">
-import type { RevealedPhase } from '~/types/game'
+import type { Player, RevealedPhase } from '~/types/game'
 import { getPhaseById } from '~/utils/phases'
+import { shouldEndGameAfterRound, totalPlayerVp } from '~/utils/scoring'
 
-defineProps<{
+const props = defineProps<{
   phases: RevealedPhase[]
   round: number
+  currentIndex: number
+  players: Player[]
+  vpPool: number
+  vpPoolInitial: number
+  lastRound: boolean
+  myId: string
+  localMode: boolean
+  canNavigate: boolean
 }>()
 
-const emit = defineEmits<{ nextRound: [] }>()
+const emit = defineEmits<{
+  setRevealIndex: [index: number]
+  adjustVp: [playerId: string, delta: number]
+  setVp: [playerId: string, value: number]
+  finishRound: []
+}>()
+
+const currentPhase = computed(() => props.phases[props.currentIndex] ?? null)
+const isLastPhase = computed(() => props.currentIndex >= props.phases.length - 1)
+const poolPercent = computed(() =>
+  props.vpPoolInitial > 0 ? (Math.max(0, props.vpPool) / props.vpPoolInitial) * 100 : 0,
+)
+const totalVp = computed(() => totalPlayerVp(props.players))
+const gameEndsAfterRound = computed(() =>
+  shouldEndGameAfterRound(props.players, props.vpPoolInitial),
+)
+
+function canEditPlayer(playerId: string): boolean {
+  if (props.localMode) return true
+  return playerId === props.myId
+}
+
+function goNext() {
+  if (isLastPhase.value) {
+    emit('finishRound')
+  } else {
+    emit('setRevealIndex', props.currentIndex + 1)
+  }
+}
 </script>
 
 <template>
@@ -15,43 +52,131 @@ const emit = defineEmits<{ nextRound: [] }>()
     <div class="text-center">
       <p class="text-sm uppercase tracking-widest text-slate-400">Round {{ round }}</p>
       <h2 class="mt-1 text-2xl font-bold text-slate-100">Phase Reveal</h2>
-    </div>
-
-    <div class="space-y-3">
-      <div
-        v-for="phase in phases"
-        :key="phase.id"
-        class="rounded-xl border-2 p-4"
-        :class="getPhaseById(phase.id).colorClass"
-      >
-        <div class="flex items-start justify-between gap-3">
-          <div>
-            <p class="text-lg font-bold">{{ getPhaseById(phase.id).label }}</p>
-            <p class="mt-0.5 text-sm opacity-80">{{ getPhaseById(phase.id).description }}</p>
-          </div>
-        </div>
-        <div class="mt-3 flex flex-wrap gap-2">
-          <span
-            v-for="name in phase.players"
-            :key="name"
-            class="rounded-full bg-white/10 px-3 py-1 text-sm font-semibold"
-          >
-            ★ {{ name }}
-          </span>
-        </div>
-      </div>
-
-      <p v-if="phases.length === 0" class="text-center text-slate-400">
-        No phases selected this round.
+      <p v-if="lastRound && !gameEndsAfterRound" class="mt-2 text-sm font-semibold text-star-400">
+        Pool empty — play continues until total VP exceeds {{ vpPoolInitial }}
+      </p>
+      <p v-else-if="gameEndsAfterRound" class="mt-2 text-sm font-semibold text-star-400">
+        Total VP exceeds the pool — finish this round for final standings
       </p>
     </div>
 
-    <button
-      type="button"
-      class="w-full rounded-xl bg-nebula-400 py-3.5 font-semibold text-space-950 transition hover:bg-nebula-300"
-      @click="emit('nextRound')"
-    >
-      Next Round →
-    </button>
+    <div class="rounded-xl border border-space-600 bg-space-800/50 p-4">
+      <div class="flex justify-between text-sm">
+        <span class="text-slate-400">Global VP Pool</span>
+        <span class="font-semibold text-star-400">{{ vpPool }} / {{ vpPoolInitial }}</span>
+      </div>
+      <div class="mt-2 h-2 overflow-hidden rounded-full bg-space-700">
+        <div
+          class="h-full rounded-full bg-star-400 transition-all"
+          :style="{ width: `${poolPercent}%` }"
+        />
+      </div>
+      <p class="mt-2 text-xs text-slate-500">
+        Chips in player vaults: {{ totalVp }} / {{ vpPoolInitial }} VP
+        <span v-if="gameEndsAfterRound"> · finish this round to score</span>
+      </p>
+    </div>
+
+    <div v-if="phases.length === 0" class="text-center text-slate-400">
+      No phases selected this round.
+    </div>
+
+    <template v-else>
+      <!-- Phase overview -->
+      <div class="space-y-2">
+        <p class="text-xs uppercase tracking-wide text-slate-400">All phases</p>
+        <div class="flex gap-2 overflow-x-auto pb-1">
+          <button
+            v-for="(phase, index) in phases"
+            :key="`${phase.id}-${index}`"
+            type="button"
+            class="shrink-0 rounded-lg border px-3 py-2 text-left text-sm transition"
+            :class="[
+              getPhaseById(phase.id).colorClass,
+              index === currentIndex ? 'ring-2 ring-white/50' : 'opacity-60 hover:opacity-90',
+            ]"
+            :disabled="!canNavigate"
+            @click="canNavigate && emit('setRevealIndex', index)"
+          >
+            <span class="font-semibold">{{ index + 1 }}. {{ getPhaseById(phase.id).shortLabel }}</span>
+          </button>
+        </div>
+      </div>
+
+      <!-- Active phase -->
+      <div
+        v-if="currentPhase"
+        class="rounded-xl border-2 p-4"
+        :class="getPhaseById(currentPhase.id).colorClass"
+      >
+        <div class="grid grid-cols-[minmax(0,1fr)_auto] items-start gap-x-4">
+          <div>
+            <p class="text-xs uppercase tracking-wide opacity-70">
+              Phase {{ currentIndex + 1 }} of {{ phases.length }}
+            </p>
+            <p class="mt-1 text-xl font-bold">{{ getPhaseById(currentPhase.id).label }}</p>
+            <p class="mt-1 text-sm opacity-80">{{ getPhaseById(currentPhase.id).description }}</p>
+          </div>
+          <div
+            v-if="currentPhase.players.length"
+            class="inline-grid grid-cols-1 justify-self-end gap-1.5"
+          >
+            <span
+              v-for="participant in currentPhase.players"
+              :key="participant.id"
+              class="rounded-full bg-white/15 px-2.5 py-1 text-center text-xs font-semibold whitespace-nowrap"
+            >
+              {{ participant.name }}
+            </span>
+          </div>
+        </div>
+      </div>
+
+      <!-- Running totals -->
+      <div class="space-y-2 rounded-xl border border-space-600 bg-space-800/30 p-4">
+        <p class="text-xs uppercase tracking-wide text-slate-400">Current scores</p>
+        <div
+          v-for="player in players"
+          :key="player.id"
+          class="flex items-center justify-between"
+        >
+          <span :class="player.id === myId ? 'text-nebula-300 font-medium' : 'text-slate-300'">
+            {{ player.name }}
+          </span>
+          <EditableVpScore
+            :value="player.vpChips"
+            :vp-pool="vpPool"
+            :vp-pool-initial="vpPoolInitial"
+            :editable="canEditPlayer(player.id)"
+            compact
+            @adjust="emit('adjustVp', player.id, $event)"
+            @set="emit('setVp', player.id, $event)"
+          />
+        </div>
+      </div>
+
+      <div class="flex gap-3">
+        <button
+          type="button"
+          class="flex-1 rounded-xl border border-space-600 py-3 font-semibold text-slate-300 disabled:opacity-40"
+          :disabled="!canNavigate || currentIndex === 0"
+          @click="emit('setRevealIndex', currentIndex - 1)"
+        >
+          Previous
+        </button>
+        <button
+          type="button"
+          class="flex-1 rounded-xl bg-nebula-400 py-3 font-semibold text-space-950 transition hover:bg-nebula-300 disabled:opacity-40"
+          :disabled="!canNavigate"
+          @click="goNext"
+        >
+          {{
+            isLastPhase
+              ? (gameEndsAfterRound ? 'Finish Round → Final Standings' : 'Next Round →')
+              : 'Next Phase →'
+          }}
+        </button>
+      </div>
+    </template>
   </div>
 </template>

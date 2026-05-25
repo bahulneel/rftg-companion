@@ -50,8 +50,8 @@ const canConfirm = computed(() => props.selected.length === limit.value && !prop
       <p class="mt-1 text-sm text-slate-400">Your selections are hidden from neighbors</p>
       <div class="mt-4 flex flex-wrap justify-center gap-2">
         <span
-          v-for="id in selected"
-          :key="id"
+          v-for="(id, index) in selected"
+          :key="`${id}-${index}`"
           class="rounded-lg border px-3 py-1.5 text-sm font-medium"
           :class="getPhaseById(id).colorClass"
         >

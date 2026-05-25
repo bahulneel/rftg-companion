@@ -2,7 +2,7 @@
 import type { Expansions } from '~/types/game'
 
 const expansions = defineModel<Expansions>({ required: true })
-const disabled = defineProps<{ disabled?: boolean }>()
+const { disabled = false } = defineProps<{ disabled?: boolean }>()
 
 const toggles = [
   { key: 'gatheringStorm' as const, label: 'Gathering Storm', desc: 'Adds Search phase' },

@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { Expansions, GameAction, PhaseId, ScoreInput } from '~/types/game'
-import { rankPlayers } from '~/utils/scoring'
+import type { Expansions, GameAction, PhaseId } from '~/types/game'
+import { getVpTiedPlayerIds, needsTiebreakInput, rankPlayers, shouldEndGameAfterRound } from '~/utils/scoring'
 import { buildJoinUrl, isValidRoomCode } from '~/utils/room'
+import { loadSavedLocalPlayers, maxLocalPlayerCounter, saveLocalPlayers } from '~/utils/localPlayers'
 
 const LOCAL_HOST_ID = 'local-host'
 
@@ -14,7 +15,8 @@ const props = defineProps<{
 const router = useRouter()
 const config = useRuntimeConfig()
 const store = useGameStore()
-const { startHost, joinHost, clientAction, hostReady, signalingWarning, selfId } = useGameRoom()
+const { startHost, joinHost, clientAction, hostReady, signalingWarning, selfId } =
+  props.mode === 'local' ? useLocalGameSession() : useGameRoom()
 const diag = useConnectionDiagnostics()
 const {
   passStep,
@@ -29,6 +31,7 @@ const isLocal = computed(() => props.mode === 'local')
 const playerName = ref('')
 const newPlayerName = ref('')
 let localPlayerCounter = 0
+let restoringLocalPlayers = false
 const localSelections = ref<PhaseId[]>([])
 const localExpansions = ref<Expansions>({
   gatheringStorm: false,
@@ -38,6 +41,17 @@ const localExpansions = ref<Expansions>({
 })
 const connecting = ref(true)
 const connectionError = ref('')
+
+function expansionsEqual(a: Expansions, b: Expansions): boolean {
+  return (
+    a.gatheringStorm === b.gatheringStorm
+    && a.rebelVsImperium === b.rebelVsImperium
+    && a.prestige === b.prestige
+    && a.goals === b.goals
+  )
+}
+
+let syncingExpansionsFromStore = false
 
 const joinUrl = computed(() => {
   if (props.mode !== 'host' || !selfId.value) return ''
@@ -61,8 +75,13 @@ const passProgress = computed(() => {
     return `${done} of ${total} players locked in`
   }
   if (store.state.screen === 'scoring') {
-    const done = store.state.players.filter((p) => store.state!.scores[p.id]?.submitted).length
-    return `${done} of ${total} scores submitted`
+    const tiedIds = getVpTiedPlayerIds(
+      store.state.players,
+      store.state.scores,
+      store.state.expansions,
+    )
+    const done = tiedIds.filter((id) => store.state!.scores[id]?.tiebreakSubmitted).length
+    return `${done} of ${tiedIds.length} tie-breakers collected`
   }
   return ''
 })
@@ -87,6 +106,10 @@ function addLocalPlayer() {
   newPlayerName.value = ''
 }
 
+function reorderPlayers(playerIds: string[]) {
+  dispatchAction({ type: 'REORDER_PLAYERS', playerIds })
+}
+
 function syncPassAndPlay() {
   if (!isLocal.value || !store.state) return
 
@@ -94,11 +117,58 @@ function syncPassAndPlay() {
     resetForPlayers(store.state.players, (id) => store.state!.confirmed[id])
     localSelections.value = []
   } else if (store.state.screen === 'scoring') {
-    resetForPlayers(
-      store.state.players,
-      (id) => store.state!.scores[id]?.submitted ?? false,
-    )
+    if (needsTiebreakInput(store.state.players, store.state.scores, store.state.expansions)) {
+      const tiedIds = getVpTiedPlayerIds(
+        store.state.players,
+        store.state.scores,
+        store.state.expansions,
+      )
+      resetForPlayers(
+        store.state.players.filter((player) => tiedIds.includes(player.id)),
+        (id) => store.state!.scores[id]?.tiebreakSubmitted ?? false,
+      )
+    }
   }
+}
+
+function persistLocalPlayers() {
+  if (!isLocal.value || !store.state || restoringLocalPlayers) return
+  const players = store.state.players
+  if (players.length === 0) return
+  saveLocalPlayers(players.map((player) => ({ id: player.id, name: player.name })))
+}
+
+function restoreLocalPlayersFromStorage() {
+  const saved = loadSavedLocalPlayers()
+  if (saved.length === 0) return
+
+  restoringLocalPlayers = true
+  try {
+    for (const player of saved) {
+      store.dispatch({ type: 'JOIN', playerId: player.id, name: player.name })
+    }
+    localPlayerCounter = maxLocalPlayerCounter(saved)
+  } finally {
+    restoringLocalPlayers = false
+  }
+}
+
+function initLocalSession() {
+  if (!isValidRoomCode(props.code)) {
+    diag.log('error', 'Invalid room code — redirecting home', { code: props.code })
+    router.replace('/')
+    return
+  }
+
+  store.initAsHost(props.code, LOCAL_HOST_ID)
+  store.connected = true
+  connecting.value = false
+  restoreLocalPlayersFromStorage()
+  diag.log('success', 'Local pass-and-play session started', { code: props.code })
+}
+
+if (import.meta.client && props.mode === 'local') {
+  initLocalSession()
 }
 
 onMounted(async () => {
@@ -110,6 +180,15 @@ onMounted(async () => {
     online: import.meta.client ? navigator.onLine : undefined,
   })
 
+  if (props.mode === 'local') {
+    diag.log('info', 'Initial connection attempt finished', {
+      connectionError: null,
+      hostReady: hostReady.value,
+      hasState: !!store.state,
+    })
+    return
+  }
+
   if (!isValidRoomCode(props.code)) {
     diag.log('error', 'Invalid room code — redirecting home', { code: props.code })
     router.replace('/')
@@ -120,11 +199,7 @@ onMounted(async () => {
   connectionError.value = ''
 
   try {
-    if (props.mode === 'local') {
-      store.initAsHost(props.code, LOCAL_HOST_ID)
-      store.connected = true
-      diag.log('success', 'Local pass-and-play session started', { code: props.code })
-    } else if (props.mode === 'host') {
+    if (props.mode === 'host') {
       const ok = await startHost(props.code)
       if (!ok) connectionError.value = 'Failed to start hosting. See connection log.'
     } else {
@@ -150,14 +225,23 @@ onMounted(async () => {
 })
 
 watch(
-  () => [store.state?.screen, store.state?.round] as const,
+  () => (store.state ? `${store.state.screen}:${store.state.round}` : null),
   () => syncPassAndPlay(),
+)
+
+watch(
+  () => (isLocal.value ? store.state?.players : null),
+  () => persistLocalPlayers(),
+  { deep: true },
 )
 
 watch(
   () => store.state?.expansions,
   (exp) => {
-    if (exp) localExpansions.value = { ...exp }
+    if (!exp || expansionsEqual(localExpansions.value, exp)) return
+    syncingExpansionsFromStore = true
+    localExpansions.value = { ...exp }
+    syncingExpansionsFromStore = false
   },
   { deep: true },
 )
@@ -183,9 +267,10 @@ function handleSetName() {
 }
 
 function handleExpansionsUpdate() {
-  if (store.isHost || isLocal.value) {
-    dispatchAction({ type: 'SET_EXPANSIONS', expansions: { ...localExpansions.value } })
-  }
+  if (syncingExpansionsFromStore || !store.state) return
+  if (!(store.isHost || isLocal.value)) return
+  if (expansionsEqual(localExpansions.value, store.state.expansions)) return
+  dispatchAction({ type: 'SET_EXPANSIONS', expansions: { ...localExpansions.value } })
 }
 
 watch(localExpansions, handleExpansionsUpdate, { deep: true })
@@ -215,22 +300,44 @@ function nextRound() {
   dispatchAction({ type: 'NEXT_ROUND' })
 }
 
+function setRevealIndex(index: number) {
+  dispatchAction({ type: 'SET_REVEAL_INDEX', index })
+}
+
 function adjustVp(playerId: string, delta: number) {
   dispatchAction({ type: 'ADJUST_VP', playerId, delta })
+}
+
+function setVp(playerId: string, value: number) {
+  dispatchAction({ type: 'SET_VP', playerId, vpChips: value })
+}
+
+function finishRevealRound() {
+  if (!store.state) return
+  if (shouldEndGameAfterRound(store.state.players, store.state.vpPoolInitial)) {
+    endGame()
+  } else {
+    nextRound()
+  }
 }
 
 function endGame() {
   dispatchAction({ type: 'END_GAME' })
 }
 
-function submitScore(score: Partial<ScoreInput>) {
+function submitTiebreak(goodsOnWorlds: number, cardsInHand: number) {
   const playerId = isLocal.value ? activePlayerId.value : store.peerId
-  if (!playerId) return
-  dispatchAction({ type: 'SUBMIT_SCORE', playerId, score })
-  if (isLocal.value && store.state?.screen === 'scoring') {
-    finishPlayerTurn(
+  if (!playerId || !store.state) return
+  dispatchAction({ type: 'SUBMIT_TIEBREAK', playerId, goodsOnWorlds, cardsInHand })
+  if (isLocal.value) {
+    const tiedIds = getVpTiedPlayerIds(
       store.state.players,
-      (id) => store.state!.scores[id]?.submitted ?? false,
+      store.state.scores,
+      store.state.expansions,
+    )
+    finishPlayerTurn(
+      store.state.players.filter((player) => tiedIds.includes(player.id)),
+      (id) => store.state!.scores[id]?.tiebreakSubmitted ?? false,
     )
   }
 }
@@ -255,15 +362,31 @@ const ranked = computed(() => {
   return rankPlayers(store.state.players, store.state.scores, store.state.expansions)
 })
 
-const allScoresSubmitted = computed(() =>
-  store.state?.players.every((p) => store.state?.scores[p.id]?.submitted) ?? false,
-)
+const needsTiebreak = computed(() => {
+  if (!store.state) return false
+  return needsTiebreakInput(store.state.players, store.state.scores, store.state.expansions)
+})
 
-const activeScorePlayer = computed(() => {
+const activeTiebreakPlayer = computed(() => {
   if (!isLocal.value || !activePlayerId.value || !store.state) return null
-  const player = store.state.players.find((p) => p.id === activePlayerId.value)
-  if (!player || store.state.scores[activePlayerId.value]?.submitted) return null
-  return player
+  const tiedIds = getVpTiedPlayerIds(
+    store.state.players,
+    store.state.scores,
+    store.state.expansions,
+  )
+  if (!tiedIds.includes(activePlayerId.value)) return null
+  if (store.state.scores[activePlayerId.value]?.tiebreakSubmitted) return null
+  return store.state.players.find((player) => player.id === activePlayerId.value) ?? null
+})
+
+const showMyTiebreakForm = computed(() => {
+  if (!store.state || !needsTiebreak.value || isLocal.value) return false
+  const tiedIds = getVpTiedPlayerIds(
+    store.state.players,
+    store.state.scores,
+    store.state.expansions,
+  )
+  return tiedIds.includes(store.peerId) && !store.state.scores[store.peerId]?.tiebreakSubmitted
 })
 
 watch(joinUrl, (url) => {
@@ -335,7 +458,7 @@ async function copyInviteLink() {
       <!-- LOBBY -->
       <div v-if="store.state.screen === 'lobby'" class="space-y-6">
         <div v-if="isLocal" class="rounded-xl border border-space-600 bg-space-800/30 px-4 py-3 text-center text-sm text-slate-400">
-          Add everyone playing at this table, then start the game. You'll pass the device for hidden phase picks.
+          Add everyone playing at this table, drag to set pass order, then start the game.
         </div>
 
         <div v-else-if="store.isHost">
@@ -400,19 +523,15 @@ async function copyInviteLink() {
           </button>
         </div>
 
-        <div v-if="(isLocal || (store.me && !showNameForm)) && store.state.players.length">
-          <h2 class="mb-3 text-lg font-semibold">Players ({{ store.playerCount }})</h2>
-          <ul class="space-y-2">
-            <li
-              v-for="player in store.state.players"
-              :key="player.id"
-              class="flex items-center justify-between rounded-lg bg-space-800/50 px-4 py-2"
-            >
-              <span>{{ player.name }}</span>
-              <span v-if="!isLocal && player.id === store.state.hostId" class="text-xs text-star-400">Host</span>
-            </li>
-          </ul>
-        </div>
+        <LobbyPlayerList
+          v-if="(isLocal || (store.me && !showNameForm)) && store.state.players.length"
+          :players="store.state.players"
+          :host-id="store.state.hostId"
+          :reorderable="isLocal || store.isHost"
+          :show-host-badge="!isLocal"
+          :show-order="isLocal || store.isHost"
+          @reorder="reorderPlayers"
+        />
 
         <ExpansionToggles v-if="store.isHost || isLocal" v-model="localExpansions" />
         <ExpansionToggles v-else v-model="localExpansions" disabled />
@@ -465,7 +584,9 @@ async function copyInviteLink() {
             :last-round="store.state.lastRound"
             :game-ended="store.state.gameEnded"
             :is-host="true"
+            local-mode
             @adjust-vp="adjustVp"
+            @set-vp="setVp"
             @end-game="endGame"
           />
         </template>
@@ -485,6 +606,7 @@ async function copyInviteLink() {
           :game-ended="store.state.gameEnded"
           :is-host="store.isHost"
           @adjust-vp="adjustVp"
+          @set-vp="setVp"
           @end-game="endGame"
         />
       </div>
@@ -494,61 +616,58 @@ async function copyInviteLink() {
         <RevealScreen
           :phases="store.state.revealedPhases"
           :round="store.state.round"
-          @next-round="nextRound"
-        />
-
-        <VpTracker
+          :current-index="store.state.revealPhaseIndex ?? 0"
           :players="store.state.players"
-          :my-id="isLocal ? '' : store.peerId"
           :vp-pool="store.state.vpPool"
           :vp-pool-initial="store.state.vpPoolInitial"
           :last-round="store.state.lastRound"
-          :game-ended="store.state.gameEnded"
-          :is-host="store.isHost || isLocal"
+          :my-id="isLocal ? '' : store.peerId"
           :local-mode="isLocal"
+          :can-navigate="store.isHost || isLocal"
+          @set-reveal-index="setRevealIndex"
           @adjust-vp="adjustVp"
-          @end-game="endGame"
+          @set-vp="setVp"
+          @finish-round="finishRevealRound"
         />
       </div>
 
       <!-- SCORING -->
       <div v-else-if="store.state.screen === 'scoring'" class="space-y-6">
-        <PassDevicePrompt
-          v-if="isLocal && passStep === 'handoff' && activePlayer && !allScoresSubmitted"
-          :player-name="activePlayer.name"
-          subtitle="Pass the device to"
-          :progress="passProgress"
-          @ready="handDeviceToPlayer"
-        />
+        <div v-if="needsTiebreak" class="space-y-4">
+          <p class="text-center text-sm font-semibold text-star-400">
+            Tie for first place — answer the tie-breaker questions
+          </p>
 
-        <ScoreSheet
-          v-else-if="isLocal && passStep === 'playing' && activeScorePlayer"
-          :expansions="store.state.expansions"
-          :score="store.state.scores[activeScorePlayer.id] ?? { vpChips: activeScorePlayer.vpChips, cardFaceValue: 0, devBonuses: 0, prestigePoints: 0, goalPoints: 0, cardsInHand: 0, goodsOnWorlds: 0, submitted: false }"
-          :player-name="activeScorePlayer.name"
-          :submitted="false"
-          @submit="submitScore"
-        />
-
-        <ScoreSheet
-          v-else-if="!isLocal && store.me && !store.state.scores[store.peerId]?.submitted"
-          :expansions="store.state.expansions"
-          :score="store.state.scores[store.peerId] ?? { vpChips: store.me.vpChips, cardFaceValue: 0, devBonuses: 0, prestigePoints: 0, goalPoints: 0, cardsInHand: 0, goodsOnWorlds: 0, submitted: false }"
-          :player-name="store.me.name"
-          :submitted="false"
-          @submit="submitScore"
-        />
-
-        <div v-if="allScoresSubmitted || ranked.length > 0">
-          <Leaderboard
-            v-if="allScoresSubmitted"
-            :ranked="ranked"
-            :expansions="store.state.expansions"
+          <PassDevicePrompt
+            v-if="isLocal && passStep === 'handoff' && activePlayer && activeTiebreakPlayer"
+            :player-name="activePlayer.name"
+            subtitle="Pass the device to"
+            :progress="passProgress"
+            @ready="handDeviceToPlayer"
           />
+
+          <TiebreakerSheet
+            v-else-if="isLocal && passStep === 'playing' && activeTiebreakPlayer"
+            :player-name="activeTiebreakPlayer.name"
+            @submit="submitTiebreak"
+          />
+
+          <TiebreakerSheet
+            v-else-if="showMyTiebreakForm && store.me"
+            :player-name="store.me.name"
+            @submit="submitTiebreak"
+          />
+
           <p v-else-if="!isLocal" class="text-center text-sm text-slate-400">
-            Waiting for all players to submit scores...
+            Waiting for tied players to submit tie-breakers...
           </p>
         </div>
+
+        <Leaderboard
+          v-if="!needsTiebreak"
+          :ranked="ranked"
+          :expansions="store.state.expansions"
+        />
       </div>
     </template>
 

@@ -17,12 +17,14 @@ export function usePassAndPlay() {
     passStep.value = 'playing'
   }
 
+  /** After a player completes their hidden turn, move to the next player at handoff. */
   function finishPlayerTurn(
     players: { id: string }[],
     isDone: (id: string) => boolean,
   ) {
+    const next = players.find((p) => !isDone(p.id))
+    activePlayerId.value = next?.id ?? null
     passStep.value = 'handoff'
-    resetForPlayers(players, isDone)
   }
 
   return {
