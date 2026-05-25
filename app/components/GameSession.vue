@@ -264,7 +264,7 @@ async function copyInviteLink() {
           v-if="showHostLobbyDrawer && gameScreen !== 'lobby'"
           class="mb-6 rounded-xl border border-space-600 bg-space-800/30 px-4 py-3 text-center text-sm text-slate-400"
         >
-          Open the numbered lobby button to share the QR code, choose how you want to join, or manage players.
+          Open the table button to share the QR code, choose how you want to join, or manage players.
         </div>
 
         <LobbyScreen
@@ -289,7 +289,7 @@ async function copyInviteLink() {
         >
           <p class="font-medium text-slate-300">Host lobby ready</p>
           <p class="mt-2">
-            Tap the numbered lobby button to share the QR code, choose how you want to join, and start the game.
+            Tap the pulsing table button to share the QR code, choose how you want to join, and start the game.
           </p>
         </div>
 
@@ -324,6 +324,7 @@ async function copyInviteLink() {
       <HostLobbyDrawer
         v-if="showHostLobbyDrawer"
         v-model:open="hostLobbyOpen"
+        :pulse-button="gameScreen === 'lobby' && !hostLobbyOpen"
         :badge-count="hostLobbyBadgeCount"
         :room-code="code"
         :join-url="joinUrl"

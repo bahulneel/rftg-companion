@@ -3,10 +3,10 @@ import type { Expansions, Player } from '~/types/game'
 
 defineProps<{
   open: boolean
+  pulseButton?: boolean
   badgeCount: number
   roomCode: string
   joinUrl: string
-  isSpectator: boolean
   pendingPeerIds: string[]
   players: Player[]
   hostId: string
@@ -49,13 +49,36 @@ function close() {
   <div>
     <button
       type="button"
-      class="fixed bottom-4 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border border-star-400/40 bg-space-800 shadow-lg shadow-black/40"
+      class="fixed bottom-4 left-4 z-40 flex h-12 w-12 items-center justify-center rounded-full border bg-space-800 shadow-lg shadow-black/40 transition"
+      :class="pulseButton && !open
+        ? 'border-star-400 lobby-fab-attention'
+        : 'border-star-400/40'"
       aria-label="Open lobby"
       @click="emit('update:open', !open)"
     >
-      <span class="text-lg font-bold text-star-400">☰</span>
       <span
-        class="absolute -top-1 -right-1 flex h-5 min-w-5 items-center justify-center rounded-full bg-star-400 px-1 text-xs font-bold text-space-950"
+        v-if="pulseButton && !open"
+        class="absolute inset-0 rounded-full bg-star-400/20 animate-ping"
+        aria-hidden="true"
+      />
+      <svg
+        class="relative h-6 w-6 text-star-400"
+        viewBox="0 0 24 24"
+        fill="none"
+        stroke="currentColor"
+        stroke-width="1.5"
+        aria-hidden="true"
+      >
+        <rect x="5" y="9" width="14" height="7" rx="1.5" />
+        <circle cx="7.5" cy="6.5" r="1.25" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="5.5" r="1.25" fill="currentColor" stroke="none" />
+        <circle cx="16.5" cy="6.5" r="1.25" fill="currentColor" stroke="none" />
+        <circle cx="7.5" cy="18.5" r="1.25" fill="currentColor" stroke="none" />
+        <circle cx="12" cy="19.5" r="1.25" fill="currentColor" stroke="none" />
+        <circle cx="16.5" cy="18.5" r="1.25" fill="currentColor" stroke="none" />
+      </svg>
+      <span
+        class="absolute -top-1 -right-1 z-10 flex h-5 min-w-5 items-center justify-center rounded-full bg-star-400 px-1 text-xs font-bold text-space-950"
       >
         {{ badgeCount }}
       </span>
@@ -141,3 +164,27 @@ function close() {
     />
   </div>
 </template>
+
+<style scoped>
+.lobby-fab-attention {
+  box-shadow:
+    0 0 0 0 rgb(250 204 21 / 0.45),
+    0 10px 15px -3px rgb(0 0 0 / 0.4);
+  animation: lobby-fab-glow 2s ease-in-out infinite;
+}
+
+@keyframes lobby-fab-glow {
+  0%,
+  100% {
+    box-shadow:
+      0 0 0 0 rgb(250 204 21 / 0.45),
+      0 10px 15px -3px rgb(0 0 0 / 0.4);
+  }
+
+  50% {
+    box-shadow:
+      0 0 0 10px rgb(250 204 21 / 0),
+      0 10px 15px -3px rgb(0 0 0 / 0.4);
+  }
+}
+</style>
