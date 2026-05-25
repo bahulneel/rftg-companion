@@ -17,8 +17,6 @@ const props = defineProps<{
   expansions: Expansions
   expansionsEditable: boolean
   hint: string
-  showInvite?: boolean
-  joinUrl?: string
   newPlayerName: string
 }>()
 
@@ -29,7 +27,6 @@ const emit = defineEmits<{
   registerAsSpectator: []
   startGame: []
   'update:expansions': [value: Expansions]
-  copyInvite: []
 }>()
 
 const localName = computed({
@@ -45,29 +42,17 @@ const showPlayerList = computed(() => {
 const showWaiting = computed(
   () => props.isRegistered && !props.canStartGame && props.playerCount >= 2,
 )
+
+const showHint = computed(() => props.hint && !props.isHost)
 </script>
 
 <template>
   <div class="space-y-6">
     <div
-      v-if="hint"
+      v-if="showHint"
       class="rounded-xl border border-space-600 bg-space-800/30 px-4 py-3 text-center text-sm text-slate-400"
     >
       {{ hint }}
-    </div>
-
-    <div v-if="showInvite && joinUrl">
-      <RoomCodeDisplay :code="roomCode" :join-url="joinUrl" />
-      <button
-        type="button"
-        class="mt-3 w-full rounded-xl border border-space-600 py-2.5 text-sm text-slate-300 hover:border-nebula-400"
-        @click="emit('copyInvite')"
-      >
-        Copy invite link
-      </button>
-      <p class="mt-2 text-center text-xs text-slate-500">
-        Players scan this QR to connect directly to your device.
-      </p>
     </div>
 
     <LobbyPlayerList

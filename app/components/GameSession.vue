@@ -50,14 +50,24 @@ const connecting = ref(true)
 const connectionError = ref('')
 
 const joinUrl = computed(() => {
-  if (props.mode !== 'host' || !selfId.value) return ''
+  if (props.mode !== 'host') return ''
+  const hostPeerId = selfId.value || store.peerId
+  if (!hostPeerId) return ''
   return buildJoinUrl(
     props.code,
-    selfId.value,
+    hostPeerId,
     config.app.baseURL,
     config.public.siteUrl as string,
   )
 })
+
+const showHostLobbySetup = computed(
+  () =>
+    !isLocal.value
+    && props.mode === 'host'
+    && store.isHost
+    && controller.screen.value === 'lobby',
+)
 
 const guestWaitingForHost = computed(
   () =>
@@ -240,13 +250,39 @@ async function copyInviteLink() {
           </span>
         </header>
 
+        <div v-if="showHostLobbySetup" class="mb-6 space-y-3">
+          <RoomCodeDisplay
+            v-if="joinUrl"
+            :code="code"
+            :join-url="joinUrl"
+          />
+          <p v-else class="text-center text-sm text-slate-400 animate-pulse">
+            Preparing invite link...
+          </p>
+          <button
+            v-if="joinUrl"
+            type="button"
+            class="w-full rounded-xl border border-space-600 py-2.5 text-sm text-slate-300 hover:border-nebula-400"
+            @click="copyInviteLink"
+          >
+            Copy invite link
+          </button>
+          <p class="text-center text-xs text-slate-500">
+            Players scan this QR to connect directly to your device.
+          </p>
+          <p
+            v-if="store.isSpectator"
+            class="rounded-lg border border-star-400/20 bg-star-400/5 px-3 py-2 text-center text-xs text-star-300/90"
+          >
+            You're running the session as host — add table players below or stay as game master only.
+          </p>
+        </div>
+
         <LobbyScreen
           v-if="controller.screen === 'lobby'"
           v-bind="controller.lobby"
           :room-code="code"
           :pending-peer-ids="pendingLobbyPeers"
-          :show-invite="!isLocal && store.isHost"
-          :join-url="joinUrl"
           :new-player-name="controller.newPlayerName"
           @update:new-player-name="controller.newPlayerName = $event"
           @reorder="controller.reorderPlayers"
@@ -254,7 +290,6 @@ async function copyInviteLink() {
           @register-as-spectator="controller.registerAsSpectator()"
           @start-game="controller.startGame()"
           @update:expansions="controller.updateExpansions"
-          @copy-invite="copyInviteLink"
         />
 
         <SelectScreen
