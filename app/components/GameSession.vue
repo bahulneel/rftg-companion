@@ -15,9 +15,10 @@ const props = defineProps<{
 const router = useRouter()
 const config = useRuntimeConfig()
 const store = useGameStore()
-const { startHost, joinHost, clientAction, hostReady, signalingWarning, selfId } =
+const { startHost, joinHost, clientAction, hostReady, connectionPhase, signalingWarning, selfId } =
   props.mode === 'local' ? useLocalGameSession() : useGameRoom()
 const diag = useConnectionDiagnostics()
+const { toast } = useToast()
 const {
   passStep,
   activePlayerId,
@@ -201,18 +202,26 @@ onMounted(async () => {
   try {
     if (props.mode === 'host') {
       const ok = await startHost(props.code)
-      if (!ok) connectionError.value = 'Failed to start hosting. See connection log.'
+      if (!ok) {
+        connectionError.value = 'Failed to start hosting. See connection log.'
+        toast(connectionError.value, 'error')
+      }
     } else {
       if (!props.hostPeerId) {
         connectionError.value = 'Missing host peer. Scan the host QR code to join.'
+        toast(connectionError.value, 'error')
         diag.log('error', connectionError.value)
         return
       }
       const ok = await joinHost(props.code, props.hostPeerId)
-      if (!ok) connectionError.value = 'Failed to join host. See connection log.'
+      if (!ok) {
+        connectionError.value = 'Failed to join host. See connection log.'
+        toast(connectionError.value, 'error')
+      }
     }
   } catch (err) {
     connectionError.value = 'Failed to establish WebRTC connection.'
+    toast(connectionError.value, 'error')
     diag.log('error', connectionError.value, err)
   } finally {
     connecting.value = false
@@ -367,6 +376,60 @@ const needsTiebreak = computed(() => {
   return needsTiebreakInput(store.state.players, store.state.scores, store.state.expansions)
 })
 
+const showConnectionBanner = computed(() => {
+  if (isLocal.value) return false
+  const phase = connectionPhase.value
+  return (
+    phase === 'connecting'
+    || phase === 'listening'
+    || phase === 'waiting-for-host'
+    || phase === 'reconnecting'
+    || phase === 'error'
+  )
+})
+
+const guestWaitingForHost = computed(
+  () =>
+    props.mode === 'guest'
+    && !hostReady.value
+    && !store.state
+    && connectionPhase.value === 'waiting-for-host',
+)
+
+const sessionPaused = computed(
+  () => !isLocal.value && connectionPhase.value === 'reconnecting',
+)
+
+const connectionBadge = computed(() => {
+  if (isLocal.value) {
+    return { label: 'Pass & Play', class: 'bg-phase-explore/20 text-phase-explore' }
+  }
+  if (connectionError.value) {
+    return { label: 'Error', class: 'bg-red-500/20 text-red-300' }
+  }
+  switch (connectionPhase.value) {
+    case 'listening':
+      return { label: 'Listening', class: 'bg-star-400/20 text-star-300' }
+    case 'waiting-for-host':
+      return { label: 'Connecting…', class: 'bg-amber-500/20 text-amber-300 animate-pulse' }
+    case 'connected':
+      if (store.isHost) {
+        const count = store.peerCount
+        return {
+          label: count > 0 ? `Hosting · ${count}` : 'Listening',
+          class: 'bg-star-400/20 text-star-300',
+        }
+      }
+      return { label: 'Connected', class: 'bg-phase-settle/20 text-phase-settle' }
+    case 'reconnecting':
+      return { label: 'Reconnecting…', class: 'bg-amber-500/20 text-amber-300 animate-pulse' }
+    case 'error':
+      return { label: 'Offline', class: 'bg-red-500/20 text-red-300' }
+    default:
+      return { label: 'Connecting…', class: 'bg-space-600/40 text-slate-400' }
+  }
+})
+
 const activeTiebreakPlayer = computed(() => {
   if (!isLocal.value || !activePlayerId.value || !store.state) return null
   const tiedIds = getVpTiedPlayerIds(
@@ -397,61 +460,68 @@ watch(signalingWarning, (warning) => {
   if (warning) diag.log('warn', 'Signaling warning shown to user', { warning })
 })
 
-watch(hostReady, (ready) => {
-  if (props.mode === 'guest' && ready) {
-    diag.log('success', 'Guest UI: host is ready — showing lobby')
-  }
-})
-
 async function copyInviteLink() {
   if (!joinUrl.value) return
   await navigator.clipboard.writeText(joinUrl.value)
+  toast('Invite link copied', 'success', 2500)
 }
 </script>
 
 <template>
   <div class="mx-auto min-h-dvh max-w-lg px-4 py-6">
-    <div v-if="connecting" class="text-center text-slate-400">
-      <p class="animate-pulse">
-        {{
-          mode === 'local'
-            ? 'Setting up pass-and-play...'
-            : mode === 'host'
-              ? 'Starting host peer...'
-              : 'Connecting to host...'
-        }}
+    <div v-if="connecting && isLocal" class="text-center text-slate-400">
+      <p class="animate-pulse">Setting up pass-and-play...</p>
+    </div>
+
+    <div v-else-if="connecting && !isLocal" class="space-y-4">
+      <ConnectionStatusBanner
+        :phase="connectionPhase"
+        :is-host="mode === 'host'"
+        :message="connectionError || signalingWarning"
+      />
+      <p class="text-center text-sm text-slate-400 animate-pulse">
+        {{ mode === 'host' ? 'Starting host peer…' : 'Joining room…' }}
       </p>
     </div>
 
     <div v-else-if="connectionError" class="space-y-4 text-center">
-      <p class="text-red-400">{{ connectionError }}</p>
+      <ConnectionStatusBanner
+        phase="error"
+        :is-host="mode === 'host'"
+        :message="connectionError"
+      />
       <NuxtLink to="/" class="text-sm text-nebula-300 hover:underline">← Back home</NuxtLink>
     </div>
 
-    <div v-else-if="mode === 'guest' && !hostReady && !store.state" class="space-y-4 text-center text-slate-400">
-      <p class="animate-pulse">Waiting for host peer...</p>
-      <p class="text-xs">The host must have the game open on their device.</p>
-      <p v-if="signalingWarning" class="text-xs text-amber-400/90">{{ signalingWarning }}</p>
-      <p class="text-xs text-slate-600">
-        Open <span class="text-slate-500">Connection log</span> below to copy diagnostics for troubleshooting.
+    <div v-else-if="guestWaitingForHost" class="space-y-4">
+      <ConnectionStatusBanner
+        :phase="connectionPhase"
+        :is-host="false"
+        :message="signalingWarning"
+      />
+      <p class="text-center text-xs text-slate-500">
+        Open <span class="text-slate-400">Connection log</span> below to copy diagnostics.
       </p>
     </div>
 
     <template v-else-if="store.state">
+      <ConnectionStatusBanner
+        v-if="showConnectionBanner"
+        :phase="connectionPhase"
+        :is-host="store.isHost"
+        :guest-count="store.peerCount"
+        :message="signalingWarning || connectionError"
+      />
+
+      <div :class="{ 'pointer-events-none opacity-60': sessionPaused }">
       <header class="mb-6 flex items-center justify-between">
         <NuxtLink to="/" class="text-sm text-slate-400 hover:text-slate-200">← Home</NuxtLink>
         <span class="font-mono text-sm tracking-widest text-star-400">{{ code }}</span>
         <span
           class="rounded-full px-2 py-0.5 text-xs"
-          :class="
-            isLocal
-              ? 'bg-phase-explore/20 text-phase-explore'
-              : store.isHost
-                ? 'bg-star-400/20 text-star-300'
-                : 'bg-phase-settle/20 text-phase-settle'
-          "
+          :class="connectionBadge.class"
         >
-          {{ isLocal ? 'Pass & Play' : store.isHost ? 'Hosting' : 'Connected' }}
+          {{ connectionBadge.label }}
         </span>
       </header>
 
@@ -668,6 +738,7 @@ async function copyInviteLink() {
           :ranked="ranked"
           :expansions="store.state.expansions"
         />
+      </div>
       </div>
     </template>
 

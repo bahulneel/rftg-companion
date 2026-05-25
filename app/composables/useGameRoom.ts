@@ -15,9 +15,19 @@ const RTC_CONFIG: RTCConfiguration = {
 
 type TrysteroRoom = ReturnType<typeof joinRoom>
 
+export type ConnectionPhase =
+  | 'idle'
+  | 'connecting'
+  | 'listening'
+  | 'waiting-for-host'
+  | 'connected'
+  | 'reconnecting'
+  | 'error'
+
 export const useGameRoom = createSharedComposable(() => {
   const store = useGameStore()
   const diag = useConnectionDiagnostics()
+  const { toast } = useToast()
   let room: TrysteroRoom | null = null
   let broadcastState: ((state: GameState, target?: string) => void) | null = null
   let sendAction: ((action: GameAction, target?: string) => void) | null = null
@@ -26,6 +36,13 @@ export const useGameRoom = createSharedComposable(() => {
 
   const hostReady = ref(false)
   const signalingWarning = ref('')
+  const connectionPhase = ref<ConnectionPhase>('idle')
+  let isHostRole = false
+  let hadHostConnection = false
+
+  function setPhase(phase: ConnectionPhase) {
+    connectionPhase.value = phase
+  }
 
   function stopPeerPolling() {
     if (peerPollTimer) {
@@ -61,6 +78,9 @@ export const useGameRoom = createSharedComposable(() => {
     hostPeerId = null
     hostReady.value = false
     signalingWarning.value = ''
+    isHostRole = false
+    hadHostConnection = false
+    setPhase('idle')
     store.reset()
     if (activeRoom) {
       await activeRoom.leave()
@@ -117,10 +137,18 @@ export const useGameRoom = createSharedComposable(() => {
 
       if (isHostRole) {
         store.peerCount++
+        setPhase('connected')
+        toast('A player joined the room', 'success')
         if (store.state) broadcastState?.(store.state, joinedPeerId)
       } else if (joinedPeerId === hostPeerId) {
         store.peerCount = 1
         hostReady.value = true
+        setPhase('connected')
+        toast(
+          hadHostConnection ? 'Reconnected to host' : 'Connected to host',
+          'success',
+        )
+        hadHostConnection = true
         diag.log('success', 'Host peer connected — guest link is live')
         stopPeerPolling()
       } else {
@@ -136,9 +164,13 @@ export const useGameRoom = createSharedComposable(() => {
 
       if (isHostRole) {
         store.peerCount = Math.max(0, store.peerCount - 1)
+        setPhase(store.peerCount > 0 ? 'connected' : 'listening')
+        toast('A player left the room', 'warn')
       } else if (leftPeerId === hostPeerId) {
         store.peerCount = 0
         hostReady.value = false
+        setPhase('reconnecting')
+        toast('Host disconnected — waiting to reconnect…', 'error', 8000)
         diag.log('error', 'Host peer disconnected')
         startPeerPolling('Waiting for host after disconnect')
       }
@@ -183,6 +215,8 @@ export const useGameRoom = createSharedComposable(() => {
             const message =
               'Having trouble reaching the host. Make sure the host still has the game open.'
             signalingWarning.value = message
+            setPhase('error')
+            toast(message, 'error')
             diag.log('error', message, details)
           },
         }
@@ -196,6 +230,8 @@ export const useGameRoom = createSharedComposable(() => {
             const message =
               'Signaling is limited — players may need to retry joining from the QR code.'
             signalingWarning.value = message
+            setPhase('error')
+            toast(message, 'warn')
             diag.log('error', message, details)
           },
         }
@@ -220,6 +256,8 @@ export const useGameRoom = createSharedComposable(() => {
         ? 'Could not open the listening room. Refresh and try again.'
         : 'Could not join the host room. Check the invite link and try again.'
       signalingWarning.value = message
+      setPhase('error')
+      toast(message, 'error')
       diag.log('error', message, err)
       if (room) {
         const failedRoom = room
@@ -239,6 +277,8 @@ export const useGameRoom = createSharedComposable(() => {
     diag.log('info', 'Starting host session', { code, selfId })
     await leaveRoom()
 
+    isHostRole = true
+    setPhase('connecting')
     hostPeerId = selfId
     store.setPeerId(selfId)
     store.initAsHost(code, selfId)
@@ -246,6 +286,8 @@ export const useGameRoom = createSharedComposable(() => {
     const ok = connectToRoom(code, selfId, true)
     if (ok) {
       hostReady.value = true
+      setPhase('listening')
+      toast('Room is open — share the QR code', 'info')
       startPeerPolling('Host listening')
     } else {
       store.reset()
@@ -270,12 +312,17 @@ export const useGameRoom = createSharedComposable(() => {
 
     await leaveRoom()
 
+    isHostRole = false
+    setPhase('connecting')
     hostPeerId = expectedHostPeerId
     hostReady.value = false
     store.setPeerId(selfId)
 
     const ok = connectToRoom(code, expectedHostPeerId, false, expectedHostPeerId)
-    if (ok) startPeerPolling('Guest waiting for host peer')
+    if (ok) {
+      setPhase('waiting-for-host')
+      startPeerPolling('Guest waiting for host peer')
+    }
     return ok
   }
 
@@ -315,6 +362,7 @@ export const useGameRoom = createSharedComposable(() => {
     clientAction,
     hostPeerId: computed(() => hostPeerId),
     hostReady,
+    connectionPhase,
     signalingWarning,
     selfId: computed(() => selfId),
   }
