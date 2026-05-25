@@ -13,6 +13,7 @@ const config = useRuntimeConfig()
 const store = useGameStore()
 const isLocal = computed(() => props.mode === 'local')
 const isHostMode = computed(() => props.mode === 'host')
+const isGuestMode = computed(() => props.mode === 'guest')
 
 const gameRoom = isLocal.value ? null : useGameRoom()
 const localSession = isLocal.value ? useLocalGameSession() : null
