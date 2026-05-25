@@ -3,11 +3,16 @@ import type { Player } from '~/types/game'
 
 const props = defineProps<{
   players: Player[]
+  pendingPeerIds?: string[]
   hostId: string
   reorderable: boolean
   showHostBadge?: boolean
   showOrder?: boolean
 }>()
+
+const pendingPeerIds = computed(() => props.pendingPeerIds ?? [])
+
+const totalCount = computed(() => props.players.length + pendingPeerIds.value.length)
 
 const emit = defineEmits<{
   reorder: [playerIds: string[]]
@@ -60,7 +65,15 @@ function onDragEnd() {
 
 <template>
   <div>
-    <h2 class="mb-1 text-lg font-semibold">Players ({{ players.length }})</h2>
+    <h2 class="mb-1 text-lg font-semibold">
+      Players ({{ totalCount }})
+      <span
+        v-if="pendingPeerIds.length"
+        class="text-sm font-normal text-slate-500"
+      >
+        · {{ pendingPeerIds.length }} connecting
+      </span>
+    </h2>
     <p v-if="reorderable" class="mb-3 text-xs text-slate-500">
       Drag to set turn order — first player picks phases first each round.
     </p>
@@ -93,6 +106,25 @@ function onDragEnd() {
         <span v-if="showHostBadge && player.id === hostId" class="shrink-0 text-xs text-star-400">
           Host
         </span>
+      </li>
+      <li
+        v-for="(peerId, index) in pendingPeerIds"
+        :key="`pending-${peerId}`"
+        class="flex items-center gap-3 rounded-lg border border-dashed border-space-600 bg-space-800/30 px-3 py-2"
+      >
+        <span
+          class="flex h-5 w-5 shrink-0 items-center justify-center"
+          aria-hidden="true"
+        >
+          <span class="h-2 w-2 animate-pulse rounded-full bg-amber-400" />
+        </span>
+        <span class="min-w-0 flex-1">
+          <span class="block font-medium text-slate-400">
+            Anonymous player {{ index + 1 }}
+          </span>
+          <span class="block text-xs text-slate-500">Connected — choosing name…</span>
+        </span>
+        <span class="shrink-0 text-xs text-amber-400/80">Connecting</span>
       </li>
     </ul>
   </div>

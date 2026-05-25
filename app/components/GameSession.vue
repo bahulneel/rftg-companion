@@ -15,7 +15,7 @@ const props = defineProps<{
 const router = useRouter()
 const config = useRuntimeConfig()
 const store = useGameStore()
-const { startHost, joinHost, clientAction, hostReady, connectionPhase, signalingWarning, selfId } =
+const { startHost, joinHost, clientAction, hostReady, connectionPhase, pendingLobbyPeers, signalingWarning, selfId } =
   props.mode === 'local' ? useLocalGameSession() : useGameRoom()
 const diag = useConnectionDiagnostics()
 const { toast } = useToast()
@@ -366,6 +366,19 @@ const isConfirmed = computed(() => {
 
 const showNameForm = computed(() => !isLocal.value && !store.me?.name)
 
+const showLobbyPlayerList = computed(() => {
+  if (!store.state || store.state.screen !== 'lobby') return false
+  if (isLocal.value) return store.state.players.length > 0
+  if (store.isHost) {
+    return store.state.players.length > 0 || pendingLobbyPeers.value.length > 0
+  }
+  return !!(
+    store.me
+    && !showNameForm.value
+    && (store.state.players.length > 0 || pendingLobbyPeers.value.length > 0)
+  )
+})
+
 const ranked = computed(() => {
   if (!store.state) return []
   return rankPlayers(store.state.players, store.state.scores, store.state.expansions)
@@ -385,6 +398,7 @@ const showConnectionBanner = computed(() => {
     || phase === 'waiting-for-host'
     || phase === 'reconnecting'
     || phase === 'error'
+    || (phase === 'connected' && store.isHost && pendingLobbyPeers.value.length > 0)
   )
 })
 
@@ -414,9 +428,16 @@ const connectionBadge = computed(() => {
       return { label: 'Connecting…', class: 'bg-amber-500/20 text-amber-300 animate-pulse' }
     case 'connected':
       if (store.isHost) {
-        const count = store.peerCount
+        const pending = pendingLobbyPeers.value.length
+        const joined = store.playerCount
+        if (pending > 0) {
+          return {
+            label: joined > 0 ? `${joined} joined · ${pending} connecting` : `${pending} connecting`,
+            class: 'bg-amber-500/20 text-amber-300',
+          }
+        }
         return {
-          label: count > 0 ? `Hosting · ${count}` : 'Listening',
+          label: store.peerCount > 0 ? `Hosting · ${store.peerCount}` : 'Listening',
           class: 'bg-star-400/20 text-star-300',
         }
       }
@@ -510,6 +531,7 @@ async function copyInviteLink() {
         :phase="connectionPhase"
         :is-host="store.isHost"
         :guest-count="store.peerCount"
+        :pending-count="pendingLobbyPeers.length"
         :message="signalingWarning || connectionError"
       />
 
@@ -594,8 +616,9 @@ async function copyInviteLink() {
         </div>
 
         <LobbyPlayerList
-          v-if="(isLocal || (store.me && !showNameForm)) && store.state.players.length"
+          v-if="showLobbyPlayerList"
           :players="store.state.players"
+          :pending-peer-ids="pendingLobbyPeers"
           :host-id="store.state.hostId"
           :reorderable="isLocal || store.isHost"
           :show-host-badge="!isLocal"

@@ -5,6 +5,7 @@ const props = defineProps<{
   phase: ConnectionPhase
   isHost: boolean
   guestCount?: number
+  pendingCount?: number
   message?: string
 }>()
 
@@ -21,10 +22,21 @@ const banner = computed(() => {
         tone: 'info' as const,
         title: 'Room open',
         detail:
-          props.guestCount && props.guestCount > 0
-            ? `${props.guestCount} player${props.guestCount === 1 ? '' : 's'} connected.`
-            : 'Share the QR code — waiting for players to join.',
+          props.pendingCount && props.pendingCount > 0
+            ? `${props.pendingCount} player${props.pendingCount === 1 ? '' : 's'} connected — waiting to join the lobby.`
+            : props.guestCount && props.guestCount > 0
+              ? `${props.guestCount} player${props.guestCount === 1 ? '' : 's'} connected.`
+              : 'Share the QR code — waiting for players to join.',
       }
+    case 'connected':
+      if (props.isHost && props.pendingCount && props.pendingCount > 0) {
+        return {
+          tone: 'info' as const,
+          title: 'Players connected',
+          detail: `${props.pendingCount} anonymous player${props.pendingCount === 1 ? '' : 's'} still choosing a name.`,
+        }
+      }
+      return null
     case 'waiting-for-host':
       return {
         tone: 'info' as const,

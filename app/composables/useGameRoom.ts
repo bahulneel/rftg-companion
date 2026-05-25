@@ -40,6 +40,26 @@ export const useGameRoom = createSharedComposable(() => {
   let isHostRole = false
   let hadHostConnection = false
 
+  const connectedPeerIds = ref<string[]>([])
+
+  function peerIdsFromRoom(): string[] {
+    if (!room) return []
+    const peers = room.getPeers()
+    if (Array.isArray(peers)) return peers.filter((id) => id !== selfId)
+    return Object.keys(peers).filter((id) => id !== selfId)
+  }
+
+  function syncConnectedPeers() {
+    connectedPeerIds.value = peerIdsFromRoom()
+    store.peerCount = connectedPeerIds.value.length
+  }
+
+  /** WebRTC peers in the room who have not yet joined the lobby (no name). */
+  const pendingLobbyPeers = computed(() => {
+    const joined = new Set(store.state?.players.map((p) => p.id) ?? [])
+    return connectedPeerIds.value.filter((id) => !joined.has(id))
+  })
+
   function setPhase(phase: ConnectionPhase) {
     connectionPhase.value = phase
   }
@@ -55,9 +75,12 @@ export const useGameRoom = createSharedComposable(() => {
     stopPeerPolling()
     peerPollTimer = setInterval(() => {
       if (!room) return
+      syncConnectedPeers()
       const peers = room.getPeers()
       diag.log('info', `${label}: peer snapshot`, {
-        peerCount: peers.length,
+        peerCount: connectedPeerIds.value.length,
+        connectedPeerIds: connectedPeerIds.value,
+        pendingLobbyPeers: pendingLobbyPeers.value,
         peers,
         selfId: store.peerId,
         expectedHostPeerId: hostPeerId,
@@ -80,6 +103,7 @@ export const useGameRoom = createSharedComposable(() => {
     signalingWarning.value = ''
     isHostRole = false
     hadHostConnection = false
+    connectedPeerIds.value = []
     setPhase('idle')
     store.reset()
     if (activeRoom) {
@@ -127,7 +151,12 @@ export const useGameRoom = createSharedComposable(() => {
 
       diag.log('info', 'Host received guest action', { type: action.type, fromPeerId })
       const newState = store.dispatch(action)
-      if (newState) broadcastState?.(newState)
+      if (newState) {
+        if (action.type === 'JOIN') {
+          toast(`${action.name} joined the lobby`, 'success')
+        }
+        broadcastState?.(newState)
+      }
     }
 
     room.onPeerJoin = (joinedPeerId) => {
@@ -135,10 +164,11 @@ export const useGameRoom = createSharedComposable(() => {
 
       diag.log('success', 'Peer joined room', { joinedPeerId, isHostRole })
 
+      syncConnectedPeers()
+
       if (isHostRole) {
-        store.peerCount++
-        setPhase('connected')
-        toast('A player joined the room', 'success')
+        setPhase(connectedPeerIds.value.length > 0 ? 'connected' : 'listening')
+        toast('A player connected — waiting for them to join the lobby', 'success')
         if (store.state) broadcastState?.(store.state, joinedPeerId)
       } else if (joinedPeerId === hostPeerId) {
         store.peerCount = 1
@@ -162,10 +192,11 @@ export const useGameRoom = createSharedComposable(() => {
     room.onPeerLeave = (leftPeerId) => {
       diag.log('warn', 'Peer left room', { leftPeerId, isHostRole })
 
+      syncConnectedPeers()
+
       if (isHostRole) {
-        store.peerCount = Math.max(0, store.peerCount - 1)
-        setPhase(store.peerCount > 0 ? 'connected' : 'listening')
-        toast('A player left the room', 'warn')
+        setPhase(connectedPeerIds.value.length > 0 ? 'connected' : 'listening')
+        toast('A player disconnected', 'warn')
       } else if (leftPeerId === hostPeerId) {
         store.peerCount = 0
         hostReady.value = false
@@ -248,6 +279,7 @@ export const useGameRoom = createSharedComposable(() => {
         initialPeers,
       })
       setupChannel(isHostRole)
+      syncConnectedPeers()
       store.connected = true
       diag.log('success', 'Room connection established', { connected: true })
       return true
@@ -363,6 +395,8 @@ export const useGameRoom = createSharedComposable(() => {
     hostPeerId: computed(() => hostPeerId),
     hostReady,
     connectionPhase,
+    connectedPeerIds: readonly(connectedPeerIds),
+    pendingLobbyPeers,
     signalingWarning,
     selfId: computed(() => selfId),
   }
