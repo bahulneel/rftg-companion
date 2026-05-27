@@ -25,6 +25,9 @@ export interface Player {
   ownerPeerId: string
   name: string
   vpChips: number
+  /** Face-up cards in tableau (start world counts as 1 when the game begins). */
+  tableauSize: number
+  tutorialEnabled: boolean
   status: 'thinking' | 'ready'
 }
 

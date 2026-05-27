@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Expansions, PhaseId } from '~/types/game'
-import { getAvailablePhases, getPhaseById } from '~/utils/phases'
+import { getAvailablePhases, getPhaseById, type PhaseDefinition } from '~/utils/phases'
+import { TUTORIAL_GROUP_BLURBS } from '~/utils/tutorial'
 
 const props = defineProps<{
   expansions: Expansions
@@ -8,6 +9,7 @@ const props = defineProps<{
   actionPickLimit: number
   selected: PhaseId[]
   locked: boolean
+  showTutorialBlurbs?: boolean
 }>()
 
 const emit = defineEmits<{
@@ -34,6 +36,21 @@ function togglePhase(id: PhaseId) {
 }
 
 const canConfirm = computed(() => props.selected.length === limit.value && !props.locked)
+
+const tutorialGroups = computed(() => {
+  const groups = new Set<PhaseDefinition['group']>()
+  for (const phase of available.value) {
+    if (phase.group !== 'expansion') groups.add(phase.group)
+  }
+  return [...groups]
+})
+
+const selectedTutorialBlurb = computed(() => {
+  if (!props.showTutorialBlurbs || props.selected.length === 0) return null
+  const lastId = props.selected[props.selected.length - 1]!
+  const group = getPhaseById(lastId).group
+  return TUTORIAL_GROUP_BLURBS[group] ?? null
+})
 </script>
 
 <template>
@@ -66,24 +83,46 @@ const canConfirm = computed(() => props.selected.length === limit.value && !prop
       </div>
     </div>
 
-    <div v-else class="grid grid-cols-2 gap-2">
-      <button
-        v-for="phase in available"
-        :key="phase.id"
-        type="button"
-        class="rounded-xl border-2 px-3 py-3 text-left transition-all active:scale-95"
-        :class="[
-          phase.colorClass,
-          selected.includes(phase.id)
-            ? 'ring-2 ring-white/50 scale-[1.02]'
-            : 'opacity-80 hover:opacity-100',
-        ]"
-        @click="togglePhase(phase.id)"
+    <template v-else>
+      <details
+        v-if="showTutorialBlurbs"
+        class="rounded-xl border border-nebula-400/20 bg-nebula-400/5 px-3 py-2 text-sm"
       >
-        <p class="font-semibold leading-tight">{{ phase.label }}</p>
-        <p class="mt-1 text-xs opacity-80">{{ phase.description }}</p>
-      </button>
-    </div>
+        <summary class="cursor-pointer font-medium text-nebula-300">Phase guide</summary>
+        <ul class="mt-2 space-y-2 text-slate-400">
+          <li v-for="group in tutorialGroups" :key="group">
+            <span class="font-medium capitalize text-slate-300">{{ group }}</span>
+            — {{ TUTORIAL_GROUP_BLURBS[group] }}
+          </li>
+        </ul>
+      </details>
+
+      <p
+        v-if="selectedTutorialBlurb"
+        class="rounded-lg border border-nebula-400/20 bg-nebula-400/5 px-3 py-2 text-sm text-slate-300"
+      >
+        {{ selectedTutorialBlurb }}
+      </p>
+
+      <div class="grid grid-cols-2 gap-2">
+        <button
+          v-for="phase in available"
+          :key="phase.id"
+          type="button"
+          class="rounded-xl border-2 px-3 py-3 text-left transition-all active:scale-95"
+          :class="[
+            phase.colorClass,
+            selected.includes(phase.id)
+              ? 'ring-2 ring-white/50 scale-[1.02]'
+              : 'opacity-80 hover:opacity-100',
+          ]"
+          @click="togglePhase(phase.id)"
+        >
+          <p class="font-semibold leading-tight">{{ phase.label }}</p>
+          <p class="mt-1 text-xs opacity-80">{{ phase.description }}</p>
+        </button>
+      </div>
+    </template>
 
     <button
       v-if="!locked"

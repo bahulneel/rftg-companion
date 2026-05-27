@@ -145,6 +145,7 @@ function close() {
           :expansions-editable="expansionsEditable"
           :hint="hint"
           :new-player-name="newPlayerName"
+          :can-set-tutorial-for-player="canSetTutorialForPlayer"
           @update:new-player-name="emit('update:newPlayerName', $event)"
           @reorder="emit('reorder', $event)"
           @add-player="emit('addPlayer')"
@@ -153,6 +154,7 @@ function close() {
           @register-as-player-peer="emit('registerAsPlayerPeer')"
           @start-game="emit('startGame')"
           @update:expansions="emit('update:expansions', $event)"
+          @set-tutorial-enabled="(playerId, enabled) => emit('setTutorialEnabled', playerId, enabled)"
         />
       </div>
     </Transition>

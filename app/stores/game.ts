@@ -171,6 +171,7 @@ export const useGameStore = defineStore('game', () => {
         for (const player of s.players) {
           player.status = 'thinking'
           player.vpChips = 0
+          player.tableauSize = TABLEAU_START_SIZE
           s.selections[player.id] = []
           s.confirmed[player.id] = false
           s.scores[player.id] = defaultScoreInput()

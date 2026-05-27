@@ -44,7 +44,8 @@ export function getRulesHints(
       return [
         { text: 'VP chips and hand sizes are open information — others may ask to see them.' },
         { text: 'When chips in the supply are gone, finish the round; use 10-value chips if needed in the final Consume.' },
-        { text: 'This tracker follows chip VP only; add development/world VP from cards at game end.' },
+        { text: 'Track face-up tableau cards here (start world = 1). Game ends at 12+ cards or when VP exceeds the pool.",
+        { text: "Chip VP here is separate from card VP; add development/world VP from cards at game end.' },
       ]
     case 'scoring':
       return [
