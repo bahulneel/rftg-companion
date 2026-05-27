@@ -13,6 +13,17 @@ export type PhaseId =
 
 export type GameScreen = 'lobby' | 'select' | 'reveal' | 'scoring'
 
+export interface CostModifier {
+  id: string
+  label: string
+  discardDelta: number
+  militaryDelta: number
+}
+
+export interface PlayerCostPlanning {
+  modifiers: CostModifier[]
+}
+
 export interface Expansions {
   gatheringStorm: boolean
   rebelVsImperium: boolean
@@ -72,6 +83,8 @@ export interface GameState {
   lastRound: boolean
   gameEnded: boolean
   scores: Record<string, ScoreInput>
+  /** Per-player cost modifiers during secret planning (select phase). */
+  costPlanning: Record<string, PlayerCostPlanning>
 }
 
 export type GameAction =
@@ -94,3 +107,4 @@ export type GameAction =
   | { type: 'SUBMIT_TIEBREAK'; playerId: string; goodsOnWorlds: number; cardsInHand: number }
   | { type: 'SUBMIT_SCORE'; playerId: string; score: Partial<ScoreInput> }
   | { type: 'SET_TUTORIAL_ENABLED'; playerId: string; enabled: boolean }
+  | { type: 'SET_COST_MODIFIERS'; playerId: string; modifiers: CostModifier[] }

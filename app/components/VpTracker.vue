@@ -32,6 +32,8 @@ const poolPercent = computed(() =>
 const empireEndTriggered = computed(() =>
   props.players.some((player) => player.empireSize >= EMPIRE_END_GAME_SIZE),
 )
+
+const vpHints = getRulesHints('vp')
 </script>
 
 <template>
@@ -83,7 +85,7 @@ const empireEndTriggered = computed(() =>
           </button>
         </div>
 
-        <RulesHint screen="vp" class="mb-4" />
+        <RulesHint :items="vpHints" class="mb-4" />
 
         <div class="mb-4 rounded-xl border border-space-600 bg-space-800/50 p-4">
           <div class="flex justify-between text-sm">

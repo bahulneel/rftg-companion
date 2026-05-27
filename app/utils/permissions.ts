@@ -106,6 +106,12 @@ export function isAuthorized(fromPeerId: string, action: GameAction, state: Game
       return player ? canSetTutorial(fromPeerId, isHost, player) : false
     }
 
+    case 'SET_COST_MODIFIERS': {
+      if (state.screen !== 'select') return false
+      const player = findPlayer(state, action.playerId)
+      return player ? canActForPlayer(fromPeerId, player) : false
+    }
+
     case 'SUBMIT_SCORE': {
       const player = findPlayer(state, action.playerId)
       return player ? canActForPlayer(fromPeerId, player) : false

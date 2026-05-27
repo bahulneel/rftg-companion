@@ -81,7 +81,7 @@ function goNext() {
       </p>
     </div>
 
-    <RulesHint screen="reveal" class="mb-2" />
+    <RulesHint :items="revealHints" class="mb-2" />
 
     <div class="rounded-xl border border-space-600 bg-space-800/50 p-4">
       <div class="flex justify-between text-sm">

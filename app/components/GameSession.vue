@@ -306,6 +306,10 @@ async function copyInviteLink() {
           @set-vp="controller.setVp"
           @adjust-empire="controller.adjustEmpire"
           @set-empire="controller.setEmpire"
+          @update-cost-modifiers="(modifiers) => {
+            const id = select.actingPlayer?.id
+            if (id) controller.setCostModifiers(id, modifiers)
+          }"
           @end-game="controller.endGame()"
         />
 
