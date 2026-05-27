@@ -175,7 +175,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     if (!playerId) return
     dispatch({ type: 'CONFIRM', playerId })
     if (usesPassAndPlay.value && store.state?.screen === 'select') {
-      finishPlayerTurn(myOwnedPlayers.value, (id) => store.state!.confirmed[id])
+      finishPlayerTurn(myOwnedPlayers.value, (id) => store.state!.confirmed[id] ?? false)
       draftSelections.value = []
     }
   }
@@ -242,7 +242,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     if (!store.state) return
 
     if (store.state.screen === 'select' && usesPassAndPlay.value) {
-      resetForPlayers(myOwnedPlayers.value, (id) => store.state!.confirmed[id])
+      resetForPlayers(myOwnedPlayers.value, (id) => store.state!.confirmed[id] ?? false)
       draftSelections.value = []
     } else if (store.state.screen === 'scoring' && usesPassAndPlay.value) {
       if (needsTiebreakInput(store.state.players, store.state.scores, store.state.expansions)) {

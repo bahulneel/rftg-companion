@@ -123,22 +123,23 @@ export const useGameRoom = createSharedComposable(() => {
 
     diag.log('info', 'Setting up state/action channels', { isHostRole, hostPeerId })
 
-    const stateChannel = room.makeAction<GameState>('state')
-    const actionChannel = room.makeAction<GameAction>('action')
+    const stateChannel = room.makeAction('state')
+    const actionChannel = room.makeAction('action')
 
     broadcastState = (state, target) => {
-      void stateChannel.send(state, target ? { target } : undefined)
+      void stateChannel.send(state as any, target ? { target } : undefined)
     }
     sendAction = (action, target) => {
-      void actionChannel.send(action, target ? { target } : undefined)
+      void actionChannel.send(action as any, target ? { target } : undefined)
     }
 
-    stateChannel.onMessage = (state, { peerId: fromPeerId }) => {
+    stateChannel.onMessage = (payload, { peerId: fromPeerId }) => {
       if (isHostRole) return
       if (fromPeerId !== hostPeerId) {
         diag.log('warn', 'Ignored state from unexpected peer', { fromPeerId, expected: hostPeerId })
         return
       }
+      const state = payload as unknown as GameState
       diag.log('success', 'Received game state from host', {
         screen: state.screen,
         playerCount: state.players.length,
@@ -146,9 +147,10 @@ export const useGameRoom = createSharedComposable(() => {
       store.applyState(state)
     }
 
-    actionChannel.onMessage = (action, { peerId: fromPeerId }) => {
+    actionChannel.onMessage = (payload, { peerId: fromPeerId }) => {
       if (!isHostRole) return
       if (fromPeerId === store.peerId) return
+      const action = payload as unknown as GameAction
 
       if (!store.state || !isAuthorized(fromPeerId, action, store.state)) {
         diag.log('warn', 'Host rejected guest action', { type: action.type, fromPeerId })
@@ -234,7 +236,7 @@ export const useGameRoom = createSharedComposable(() => {
 
     const callbacks = expectedHostPeerId
       ? {
-          onPeerHandshake(peerId: string) {
+          async onPeerHandshake(peerId: string) {
             diag.log('info', 'Guest handshake with peer', { peerId, expectedHostPeerId })
             if (peerId !== expectedHostPeerId) {
               diag.log('error', 'Handshake rejected — peer is not the expected host', {

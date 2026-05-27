@@ -182,7 +182,9 @@ export const useGameStore = defineStore('game', () => {
       case 'REORDER_PLAYERS': {
         if (s.screen !== 'lobby') break
         const byId = Object.fromEntries(s.players.map((player) => [player.id, player]))
-        const reordered = action.playerIds.map((id) => byId[id]).filter(Boolean)
+        const reordered = action.playerIds
+          .map((id) => byId[id])
+          .filter((player): player is Player => !!player)
         if (reordered.length !== s.players.length) break
         s.players = reordered
         break
