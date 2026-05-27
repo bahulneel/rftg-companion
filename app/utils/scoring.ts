@@ -200,14 +200,14 @@ export interface TiebreakSummary {
 
 function winnerOverLoserReason(winner: ScoreInput, loser: ScoreInput): string {
   if (winner.goodsOnWorlds !== loser.goodsOnWorlds) {
-    return `more goods on worlds (${winner.goodsOnWorlds} vs ${loser.goodsOnWorlds})`
+    return `more cargo on planets (${winner.goodsOnWorlds} vs ${loser.goodsOnWorlds})`
   }
   return `more cards in hand (${winner.cardsInHand} vs ${loser.cardsInHand})`
 }
 
 function loserVsWinnerReason(loser: ScoreInput, winner: ScoreInput): string {
   if (loser.goodsOnWorlds !== winner.goodsOnWorlds) {
-    return `fewer goods on worlds (${loser.goodsOnWorlds} vs ${winner.goodsOnWorlds})`
+    return `fewer cargo on planets (${loser.goodsOnWorlds} vs ${winner.goodsOnWorlds})`
   }
   return `fewer cards in hand (${loser.cardsInHand} vs ${winner.cardsInHand})`
 }
@@ -229,7 +229,7 @@ export function buildTiebreakSummary(ranked: RankedPlayer[]): TiebreakSummary | 
   if (winners.length === leaders.length) {
     return {
       headline: 'Tie-break did not separate the leaders',
-      detail: `All leaders had ${best.goodsOnWorlds} goods on worlds and ${best.cardsInHand} cards in hand, so they share the win.`,
+      detail: `All leaders had ${best.goodsOnWorlds} cargo on planets and ${best.cardsInHand} cards in hand, so they share the win.`,
       playerNotes: Object.fromEntries(
         leaders.map((player) => [player.id, 'Shared win — tie-break was identical']),
       ),
@@ -254,7 +254,7 @@ export function buildTiebreakSummary(ranked: RankedPlayer[]): TiebreakSummary | 
 
   return {
     headline,
-    detail: `Leaders were tied on ${topTotal} VP. Official tie-break is most goods on worlds, then most cards in hand — decided by ${decidingReason}.`,
+    detail: `Leaders were tied on ${topTotal} VP. Tie-break is most cargo on planets, then most cards in hand — decided by ${decidingReason}.`,
     playerNotes,
   }
 }

@@ -1,6 +1,6 @@
 # Race for the Galaxy — Digital Companion
 
-A **client-only** web app that replaces physical **action selection cards** and **VP chips** for [Race for the Galaxy](https://boardgamegeek.com/boardgame/28143/race-galaxy) (2nd edition). Players secretly choose phases on their phones, reveal in official order, and track chip VP plus tableau size through end game and final scoring.
+A **client-only** web app that replaces physical **action selection cards** and **VP chips** for [Race for the Galaxy](https://boardgamegeek.com/boardgame/28143/race-galaxy) (2nd edition). Players secretly choose phases on their phones, reveal in official order, and track chip VP plus empire size through end game and final scoring.
 
 Built with **Nuxt 4**, **Vue 3**, **Pinia**, **Tailwind CSS 4**, and **WebRTC** ([Trystero](https://trystero.dev)) for peer-to-peer sync — **no backend**.
 
@@ -129,7 +129,7 @@ docs/               Design notes, decisions, roadmap (see docs/README.md)
 The game ends **after the current round** when either:
 
 1. **VP pool** — Total chips in player vaults **exceeds** the initial supply (`12 × players`), or  
-2. **Tableau** — Any player has **12+** face-up tableau cards (`TABLEAU_END_GAME_SIZE`).
+2. **Empire** — Any player has **12+** cards in their empire (`EMPIRE_END_GAME_SIZE`).
 
 When the supply is empty but total VP has not exceeded it, play continues (**last round** banner) until one of the above triggers.
 

@@ -1,7 +1,12 @@
 <script setup lang="ts">
 import type { Expansions, PhaseId } from '~/types/game'
 import { getAvailablePhases, getPhaseById, type PhaseDefinition } from '~/utils/phases'
-import { TUTORIAL_GROUP_BLURBS } from '~/utils/tutorial'
+import {
+  TUTORIAL_CARD_BASICS,
+  TUTORIAL_CORE_CONCEPT,
+  TUTORIAL_GROUP_BLURBS,
+  TUTORIAL_PHASE_TITLES,
+} from '~/utils/tutorial'
 
 const props = defineProps<{
   expansions: Expansions
@@ -88,10 +93,18 @@ const selectedTutorialBlurb = computed(() => {
         v-if="showTutorialBlurbs"
         class="rounded-xl border border-nebula-400/20 bg-nebula-400/5 px-3 py-2 text-sm"
       >
-        <summary class="cursor-pointer font-medium text-nebula-300">Phase guide</summary>
+        <summary class="cursor-pointer font-medium text-nebula-300">Tutorial: cards &amp; phases</summary>
+        <p class="mt-2 text-slate-300">{{ TUTORIAL_CORE_CONCEPT }}</p>
+        <ul class="mt-3 space-y-1.5 text-slate-400">
+          <li v-for="item in TUTORIAL_CARD_BASICS" :key="item.term">
+            <span class="font-medium text-slate-300">{{ item.term }}</span>
+            — {{ item.detail }}
+          </li>
+        </ul>
+        <p class="mt-4 text-xs font-medium uppercase tracking-wide text-slate-500">Phases</p>
         <ul class="mt-2 space-y-2 text-slate-400">
           <li v-for="group in tutorialGroups" :key="group">
-            <span class="font-medium capitalize text-slate-300">{{ group }}</span>
+            <span class="font-medium text-slate-300">{{ TUTORIAL_PHASE_TITLES[group] }}</span>
             — {{ TUTORIAL_GROUP_BLURBS[group] }}
           </li>
         </ul>

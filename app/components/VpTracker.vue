@@ -97,7 +97,7 @@ const empireEndTriggered = computed(() =>
             />
           </div>
           <p class="mt-2 text-xs text-slate-500">
-            Game can end at {{ EMPIRE_END_GAME_SIZE }}+ cards in a player's empire (start world counts as 1).
+            Game can end at {{ EMPIRE_END_GAME_SIZE }}+ cards in a player's empire (your start circle counts as 1).
           </p>
         </div>
 
@@ -119,7 +119,7 @@ const empireEndTriggered = computed(() =>
             </div>
           </div>
           <div>
-            <p class="text-sm text-slate-400">Empire size (worlds &amp; developments)</p>
+            <p class="text-sm text-slate-400">Empire size (circles &amp; diamonds in play)</p>
             <div class="mt-2 flex justify-center">
               <EditableEmpireScore
                 :value="primaryPlayer.empireSize"

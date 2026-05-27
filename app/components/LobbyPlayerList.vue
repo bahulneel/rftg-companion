@@ -127,7 +127,7 @@ function isOwnPlayer(player: Player): boolean {
         <label
           v-if="canSetTutorialForPlayer?.(player.id)"
           class="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-400"
-          :title="'Show phase picker hints for ' + player.name"
+          :title="'Show card & phase tutorial for ' + player.name"
         >
           <input
             type="checkbox"

@@ -19,13 +19,13 @@ function submit() {
   <div class="rounded-xl border border-star-400/30 bg-star-400/10 p-4">
     <h3 class="font-semibold text-slate-100">Break the tie — {{ playerName }}</h3>
     <p class="mt-1 text-sm text-slate-400">
-      RFTG tie-breaker: most goods on worlds, then most cards in hand.
+      Tie-breaker: most cargo on planets, then most cards in hand.
     </p>
 
     <form class="mt-4 space-y-3" @submit.prevent="submit">
       <div class="grid grid-cols-2 gap-3">
         <div>
-          <label class="text-xs text-slate-400">Goods on worlds</label>
+          <label class="text-xs text-slate-400">Cargo on planets</label>
           <input
             v-model.number="goodsOnWorlds"
             type="number"
