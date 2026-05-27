@@ -131,56 +131,19 @@ const tableauEndTriggered = computed(() =>
           </div>
         </div>
 
-        <div class="space-y-2">
-          <p class="text-xs uppercase tracking-wide text-slate-400">All Players</p>
-          <div
-            v-for="player in players"
-            :key="player.id"
-            class="rounded-lg bg-space-800/50 px-3 py-2"
-          >
-            <div class="flex items-center justify-between gap-2">
-              <span
-                :class="player.id === primaryVaultPlayerId ? 'text-nebula-300 font-medium' : 'text-slate-300'"
-              >
-                {{ player.name }}
-              </span>
-              <div class="flex shrink-0 items-center gap-3">
-                <div class="text-right">
-                  <p class="text-[10px] uppercase text-slate-500">VP</p>
-                  <EditableVpScore
-                    v-if="canEditPlayer(player.id)"
-                    :value="player.vpChips"
-                    :vp-pool="vpPool"
-                    :vp-pool-initial="vpPoolInitial"
-                    :editable="true"
-                    compact
-                    @adjust="emit('adjustVp', player.id, $event)"
-                    @set="emit('setVp', player.id, $event)"
-                  />
-                  <span v-else class="font-semibold text-star-400">{{ player.vpChips }}</span>
-                </div>
-                <div class="text-right">
-                  <p class="text-[10px] uppercase text-slate-500">Tab</p>
-                  <EditableTableauScore
-                    v-if="canEditPlayer(player.id)"
-                    :value="player.tableauSize"
-                    :editable="true"
-                    compact
-                    @adjust="emit('adjustTableau', player.id, $event)"
-                    @set="emit('setTableau', player.id, $event)"
-                  />
-                  <span
-                    v-else
-                    class="font-semibold"
-                    :class="player.tableauSize >= TABLEAU_END_GAME_SIZE ? 'text-phase-settle' : 'text-slate-400'"
-                  >
-                    {{ player.tableauSize }}
-                  </span>
-                </div>
-              </div>
-            </div>
-          </div>
-        </div>
+        <PlayerScoreList
+          title="All Players"
+          :players="players"
+          :highlight-player-id="primaryVaultPlayerId"
+          :vp-pool="vpPool"
+          :vp-pool-initial="vpPoolInitial"
+          :can-edit-player="canEditPlayer"
+          row-class="rounded-lg bg-space-800/50 px-3 py-2"
+          @adjust-vp="(id, delta) => emit('adjustVp', id, delta)"
+          @set-vp="(id, value) => emit('setVp', id, value)"
+          @adjust-tableau="(id, delta) => emit('adjustTableau', id, delta)"
+          @set-tableau="(id, value) => emit('setTableau', id, value)"
+        />
 
         <button
           v-if="showEndGame && !gameEnded"
