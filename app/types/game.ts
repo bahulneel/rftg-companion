@@ -91,3 +91,4 @@ export type GameAction =
   | { type: 'END_GAME' }
   | { type: 'SUBMIT_TIEBREAK'; playerId: string; goodsOnWorlds: number; cardsInHand: number }
   | { type: 'SUBMIT_SCORE'; playerId: string; score: Partial<ScoreInput> }
+  | { type: 'SET_TUTORIAL_ENABLED'; playerId: string; enabled: boolean }

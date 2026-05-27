@@ -43,6 +43,10 @@ export function canControlSession(isHost: boolean): boolean {
   return isHost
 }
 
+export function canSetTutorial(fromPeerId: string, isHost: boolean, player: Player): boolean {
+  return isHost || player.ownerPeerId === fromPeerId
+}
+
 function findPlayer(state: GameState, playerId: string): Player | undefined {
   return state.players.find((player) => player.id === playerId)
 }

@@ -9,6 +9,8 @@ export default defineNuxtConfig({
   compatibilityDate: '2025-07-15',
   ssr: false,
   devtools: { enabled: true },
+  /** Client source maps for production (GitHub Pages) — readable stack traces in DevTools. */
+  sourcemap: { client: true },
   modules: ['@pinia/nuxt'],
   components: [
     '~/components',
