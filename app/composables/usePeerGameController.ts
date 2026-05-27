@@ -180,6 +180,14 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     dispatch({ type: 'SET_VP', playerId, vpChips: value })
   }
 
+  function adjustEmpire(playerId: string, delta: number) {
+    dispatch({ type: 'ADJUST_EMPIRE', playerId, delta })
+  }
+
+  function setEmpire(playerId: string, value: number) {
+    dispatch({ type: 'SET_EMPIRE', playerId, empireSize: value })
+  }
+
   function setRevealIndex(index: number) {
     dispatch({ type: 'SET_REVEAL_INDEX', index })
   }
@@ -452,7 +460,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     showVpTracker: !store.isSpectator,
     showEndGame: canControlSession(store.isHost),
     canEditPlayer,
-    primaryVaultPlayerId: actingPlayerId.value ?? '',
+    primaryScorePlayerId: actingPlayerId.value ?? '',
   }))
 
   const reveal = computed(() => ({
@@ -510,6 +518,8 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     handDeviceToPlayer,
     adjustVp,
     setVp,
+    adjustEmpire,
+    setEmpire,
     setRevealIndex,
     finishRevealRound,
     endGame,

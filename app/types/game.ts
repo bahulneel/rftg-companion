@@ -25,8 +25,8 @@ export interface Player {
   ownerPeerId: string
   name: string
   vpChips: number
-  /** Face-up cards in tableau (start world counts as 1 when the game begins). */
-  tableauSize: number
+  /** Cards in the player's empire (start world counts as 1 when the game begins). */
+  empireSize: number
   tutorialEnabled: boolean
   status: 'thinking' | 'ready'
 }
@@ -88,6 +88,8 @@ export type GameAction =
   | { type: 'SET_REVEAL_INDEX'; index: number }
   | { type: 'ADJUST_VP'; playerId: string; delta: number }
   | { type: 'SET_VP'; playerId: string; vpChips: number }
+  | { type: 'ADJUST_EMPIRE'; playerId: string; delta: number }
+  | { type: 'SET_EMPIRE'; playerId: string; empireSize: number }
   | { type: 'END_GAME' }
   | { type: 'SUBMIT_TIEBREAK'; playerId: string; goodsOnWorlds: number; cardsInHand: number }
   | { type: 'SUBMIT_SCORE'; playerId: string; score: Partial<ScoreInput> }

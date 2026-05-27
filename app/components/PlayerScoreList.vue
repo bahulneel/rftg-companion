@@ -1,6 +1,6 @@
 <script setup lang="ts">
 import type { Player } from '~/types/game'
-import { TABLEAU_END_GAME_SIZE } from '~/utils/scoring'
+import { EMPIRE_END_GAME_SIZE } from '~/utils/scoring'
 
 const props = defineProps<{
   players: Player[]
@@ -16,8 +16,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
-  adjustTableau: [playerId: string, delta: number]
-  setTableau: [playerId: string, value: number]
+  adjustEmpire: [playerId: string, delta: number]
+  setEmpire: [playerId: string, value: number]
 }>()
 
 function isHighlighted(playerId: string) {
@@ -41,7 +41,7 @@ function isHighlighted(playerId: string) {
           VP
         </p>
         <p class="w-[7.5rem] text-center text-[10px] font-medium uppercase tracking-wide text-slate-500">
-          Tableau
+          Empire
         </p>
       </div>
     </div>
@@ -73,20 +73,20 @@ function isHighlighted(playerId: string) {
           <span v-else class="text-lg font-semibold text-star-400">{{ player.vpChips }}</span>
         </div>
         <div class="flex w-[7.5rem] justify-center">
-          <EditableTableauScore
+          <EditableEmpireScore
             v-if="canEditPlayer(player.id)"
-            :value="player.tableauSize"
+            :value="player.empireSize"
             :editable="true"
             compact
-            @adjust="emit('adjustTableau', player.id, $event)"
-            @set="emit('setTableau', player.id, $event)"
+            @adjust="emit('adjustEmpire', player.id, $event)"
+            @set="emit('setEmpire', player.id, $event)"
           />
           <span
             v-else
             class="text-lg font-semibold"
-            :class="player.tableauSize >= TABLEAU_END_GAME_SIZE ? 'text-phase-settle' : 'text-slate-400'"
+            :class="player.empireSize >= EMPIRE_END_GAME_SIZE ? 'text-phase-settle' : 'text-slate-400'"
           >
-            {{ player.tableauSize }}
+            {{ player.empireSize }}
           </span>
         </div>
       </div>

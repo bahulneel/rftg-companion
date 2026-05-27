@@ -1,17 +1,38 @@
 import type { Player } from '~/types/game'
 import type { PhaseDefinition } from '~/utils/phases'
 
+/** Plain-language reminders shown when tutorial mode is on. */
+export const TUTORIAL_CORE_CONCEPT =
+  'Everything in the game is a card.'
+
+export const TUTORIAL_CARD_BASICS: { term: string; detail: string }[] = [
+  { term: 'Planets', detail: 'Circle cards.' },
+  { term: 'Developments', detail: 'Diamond cards.' },
+  { term: 'Money', detail: 'Any card you discard from your hand to pay for something.' },
+  { term: 'Cargo (goods)', detail: 'A card placed face-down under a planet card.' },
+]
+
+export const TUTORIAL_PHASE_TITLES: Record<PhaseDefinition['group'], string> = {
+  explore: 'Explore',
+  develop: 'Develop',
+  settle: 'Settle',
+  consume: 'Consume',
+  produce: 'Produce',
+  expansion: 'Expansion',
+}
+
+/** One-line phase reminders (tutorial picker + selection hint). */
 export const TUTORIAL_GROUP_BLURBS: Record<PhaseDefinition['group'], string> = {
   explore:
-    'Draw from the deck and keep cards. Use this to find worlds to settle or developments to build.',
+    'Draw cards from the deck to find new planets (circles) and developments (diamonds).',
   develop:
-    'Pay the cost to play a development from your hand. The bonus discounts one diamond development by 1 card.',
+    'Play a diamond from your hand by discarding other hand cards as money.',
   settle:
-    'Play a world from your hand onto your tableau. Military worlds cost less; non-military may let you draw after.',
+    'Play a circle from your hand — pay with discarded cards as money, or use your empire’s military strength.',
   consume:
-    'Trade a good for cards, then run consume powers for VP chips. ×2 doubles chip gains this phase.',
+    'Discard face-down cargo from your planets to gain new cards or victory points.',
   produce:
-    'Place goods on worlds that produce and have no good yet.',
+    'Place a card face-down as cargo under an empty production planet.',
   expansion:
     'Expansion-specific phase — check your expansion rules for Search or Repair.',
 }

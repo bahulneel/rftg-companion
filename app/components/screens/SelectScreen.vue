@@ -26,7 +26,7 @@ defineProps<{
   showEndGame: boolean
   showTutorialBlurbs: boolean
   canEditPlayer: (playerId: string) => boolean
-  primaryVaultPlayerId: string
+  primaryScorePlayerId: string
 }>()
 
 const emit = defineEmits<{
@@ -35,8 +35,8 @@ const emit = defineEmits<{
   confirm: []
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
-  adjustTableau: [playerId: string, delta: number]
-  setTableau: [playerId: string, value: number]
+  adjustEmpire: [playerId: string, delta: number]
+  setEmpire: [playerId: string, value: number]
   endGame: []
 }>()
 </script>
@@ -90,7 +90,7 @@ const emit = defineEmits<{
     <VpTracker
       v-if="showVpTracker && !showHandoff"
       :players="allPlayers"
-      :primary-vault-player-id="primaryVaultPlayerId"
+      :primary-score-player-id="primaryScorePlayerId"
       :vp-pool="vp.pool"
       :vp-pool-initial="vp.poolInitial"
       :last-round="vp.lastRound"
@@ -99,8 +99,8 @@ const emit = defineEmits<{
       :can-edit-player="canEditPlayer"
       @adjust-vp="(playerId, delta) => emit('adjustVp', playerId, delta)"
       @set-vp="(playerId, value) => emit('setVp', playerId, value)"
-      @adjust-tableau="(playerId, delta) => emit('adjustTableau', playerId, delta)"
-      @set-tableau="(playerId, value) => emit('setTableau', playerId, value)"
+      @adjust-empire="(playerId, delta) => emit('adjustEmpire', playerId, delta)"
+      @set-empire="(playerId, value) => emit('setEmpire', playerId, value)"
       @end-game="emit('endGame')"
     />
   </div>

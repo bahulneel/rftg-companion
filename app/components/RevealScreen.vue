@@ -2,9 +2,9 @@
 import type { Player, RevealedPhase } from '~/types/game'
 import { getPhaseById } from '~/utils/phases'
 import {
+  EMPIRE_END_GAME_SIZE,
   getEndGameTriggers,
   shouldEndGameAfterRound,
-  TABLEAU_END_GAME_SIZE,
   totalPlayerVp,
 } from '~/utils/scoring'
 
@@ -25,8 +25,8 @@ const emit = defineEmits<{
   setRevealIndex: [index: number]
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
-  adjustTableau: [playerId: string, delta: number]
-  setTableau: [playerId: string, value: number]
+  adjustEmpire: [playerId: string, delta: number]
+  setEmpire: [playerId: string, value: number]
   finishRound: []
 }>()
 
@@ -49,12 +49,12 @@ const endGameMessage = computed(() => {
   if (triggers.includes('vp_pool')) {
     parts.push('total VP exceeds the pool')
   }
-  if (triggers.includes('tableau')) {
-    parts.push(`a player has ${TABLEAU_END_GAME_SIZE}+ tableau cards`)
+  if (triggers.includes('empire')) {
+    parts.push(`a player has ${EMPIRE_END_GAME_SIZE}+ cards in their empire`)
   }
   return `${parts.join(' and ')} — finish this round for final standings`
 })
-const tableauEndTriggered = computed(() => endGameTriggers.value.includes('tableau'))
+const empireEndTriggered = computed(() => endGameTriggers.value.includes('empire'))
 
 function goNext() {
   if (isLastPhase.value) {
@@ -71,7 +71,7 @@ function goNext() {
       <p class="text-sm uppercase tracking-widest text-slate-400">Round {{ round }}</p>
       <h2 class="mt-1 text-2xl font-bold text-slate-100">Phase Reveal</h2>
       <p
-        v-if="lastRound && !gameEndsAfterRound && !tableauEndTriggered"
+        v-if="lastRound && !gameEndsAfterRound && !empireEndTriggered"
         class="mt-2 text-sm font-semibold text-star-400"
       >
         Pool empty — play continues until total VP exceeds {{ vpPoolInitial }}
@@ -95,17 +95,17 @@ function goNext() {
         />
       </div>
       <p class="mt-2 text-xs text-slate-500">
-        Chips in player vaults: {{ totalVp }} / {{ vpPoolInitial }} VP
+        VP chips taken: {{ totalVp }} / {{ vpPoolInitial }}
         <span v-if="gameEndsAfterRound"> · finish this round to score</span>
       </p>
       <p class="mt-1 text-xs text-slate-500">
-        Tableau:
+        Empire:
         <template v-for="(player, index) in players" :key="player.id">
           <span v-if="index > 0"> · </span>
           <span
-            :class="player.tableauSize >= TABLEAU_END_GAME_SIZE ? 'text-phase-settle font-medium' : ''"
+            :class="player.empireSize >= EMPIRE_END_GAME_SIZE ? 'text-phase-settle font-medium' : ''"
           >
-            {{ player.name }} {{ player.tableauSize }}
+            {{ player.name }} {{ player.empireSize }}
           </span>
         </template>
       </p>
@@ -174,8 +174,8 @@ function goNext() {
         :can-edit-player="canEditPlayer"
         @adjust-vp="(id, delta) => emit('adjustVp', id, delta)"
         @set-vp="(id, value) => emit('setVp', id, value)"
-        @adjust-tableau="(id, delta) => emit('adjustTableau', id, delta)"
-        @set-tableau="(id, value) => emit('setTableau', id, value)"
+        @adjust-empire="(id, delta) => emit('adjustEmpire', id, delta)"
+        @set-empire="(id, value) => emit('setEmpire', id, value)"
       />
 
       <div class="flex gap-3">
