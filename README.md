@@ -14,7 +14,7 @@ Built with **Nuxt 4**, **Vue 3**, **Pinia**, **Tailwind CSS 4**, and **WebRTC** 
 |------------|------------|
 | Action cards (1 per player, 2 in experienced 2-player) | Secret phase picker → simultaneous reveal in game order |
 | VP chips (12 × player count) | Score tracker with global pool and per-player vaults |
-| Tableau / empire size (12+ ends game) | Per-player **tableau** counter (starts at 1 for the start world) |
+| Empire size (12+ ends game) | Per-player **empire** counter (starts at 1 for the start world) |
 | End-game scoring | Score sheet, tie-breakers, podium leaderboard |
 
 The app is a **table companion**, not a full digital implementation: it does **not** hold hands, run the deck, or enforce card costs. Players keep physical cards and use the app for phases, chips, and reminders.
@@ -35,7 +35,7 @@ The app is a **table companion**, not a full digital implementation: it does **n
 
 1. **Select** — Each player picks phase(s), confirms (choices hidden from others).
 2. **Reveal** — Phases run in order; develop/settle stack when multiple players chose them.
-3. **Track** — Adjust VP chips (pool-aware) and tableau size during play.
+3. **Track** — Adjust VP chips (pool-aware) and empire size during play.
 4. **Score** — Final totals, VP tie-break (goods, then cards in hand), leaderboard.
 
 ### Rules reminders

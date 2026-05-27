@@ -2,9 +2,9 @@
 import type { Player, RevealedPhase } from '~/types/game'
 import { getPhaseById } from '~/utils/phases'
 import {
+  EMPIRE_END_GAME_SIZE,
   getEndGameTriggers,
   shouldEndGameAfterRound,
-  TABLEAU_END_GAME_SIZE,
   totalPlayerVp,
 } from '~/utils/scoring'
 
@@ -25,8 +25,8 @@ const emit = defineEmits<{
   setRevealIndex: [index: number]
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
-  adjustTableau: [playerId: string, delta: number]
-  setTableau: [playerId: string, value: number]
+  adjustEmpire: [playerId: string, delta: number]
+  setEmpire: [playerId: string, value: number]
   finishRound: []
 }>()
 
@@ -49,12 +49,12 @@ const endGameMessage = computed(() => {
   if (triggers.includes('vp_pool')) {
     parts.push('total VP exceeds the pool')
   }
-  if (triggers.includes('tableau')) {
-    parts.push(`a player has ${TABLEAU_END_GAME_SIZE}+ tableau cards`)
+  if (triggers.includes('empire')) {
+    parts.push(`a player has ${EMPIRE_END_GAME_SIZE}+ cards in their empire`)
   }
   return `${parts.join(' and ')} — finish this round for final standings`
 })
-const tableauEndTriggered = computed(() => endGameTriggers.value.includes('tableau'))
+const empireEndTriggered = computed(() => endGameTriggers.value.includes('empire'))
 
 function goNext() {
   if (isLastPhase.value) {
@@ -71,7 +71,7 @@ function goNext() {
       <p class="text-sm uppercase tracking-widest text-slate-400">Round {{ round }}</p>
       <h2 class="mt-1 text-2xl font-bold text-slate-100">Phase Reveal</h2>
       <p
-        v-if="lastRound && !gameEndsAfterRound && !tableauEndTriggered"
+        v-if="lastRound && !gameEndsAfterRound && !empireEndTriggered"
         class="mt-2 text-sm font-semibold text-star-400"
       >
         Pool empty — play continues until total VP exceeds {{ vpPoolInitial }}
@@ -95,17 +95,17 @@ function goNext() {
         />
       </div>
       <p class="mt-2 text-xs text-slate-500">
-        Chips in player vaults: {{ totalVp }} / {{ vpPoolInitial }} VP
+        VP chips taken: {{ totalVp }} / {{ vpPoolInitial }}
         <span v-if="gameEndsAfterRound"> · finish this round to score</span>
       </p>
       <p class="mt-1 text-xs text-slate-500">
-        Tableau:
+        Empire:
         <template v-for="(player, index) in players" :key="player.id">
           <span v-if="index > 0"> · </span>
           <span
-            :class="player.tableauSize >= TABLEAU_END_GAME_SIZE ? 'text-phase-settle font-medium' : ''"
+            :class="player.empireSize >= EMPIRE_END_GAME_SIZE ? 'text-phase-settle font-medium' : ''"
           >
-            {{ player.name }} {{ player.tableauSize }}
+            {{ player.name }} {{ player.empireSize }}
           </span>
         </template>
       </p>
@@ -166,33 +166,51 @@ function goNext() {
 
       <div class="space-y-2 rounded-xl border border-space-600 bg-space-800/30 p-4">
         <p class="text-xs uppercase tracking-wide text-slate-400">Current scores</p>
+
+        <div class="flex items-end justify-between gap-2">
+          <span class="min-w-0 flex-1" aria-hidden="true" />
+          <div class="flex shrink-0 items-end gap-3">
+            <p class="w-[7.5rem] text-center text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              VP
+            </p>
+            <p class="w-[7.5rem] text-center text-[10px] font-medium uppercase tracking-wide text-slate-500">
+              Empire
+            </p>
+          </div>
+        </div>
+
         <div
           v-for="player in players"
           :key="player.id"
-          class="flex items-center justify-between"
+          class="flex items-center justify-between gap-2"
         >
           <span
+            class="min-w-0 flex-1 truncate"
             :class="player.id === highlightPlayerId ? 'text-nebula-300 font-medium' : 'text-slate-300'"
           >
             {{ player.name }}
           </span>
-          <div class="flex items-center gap-3">
-            <EditableVpScore
-              :value="player.vpChips"
-              :vp-pool="vpPool"
-              :vp-pool-initial="vpPoolInitial"
-              :editable="canEditPlayer(player.id)"
-              compact
-              @adjust="emit('adjustVp', player.id, $event)"
-              @set="emit('setVp', player.id, $event)"
-            />
-            <EditableTableauScore
-              :value="player.tableauSize"
-              :editable="canEditPlayer(player.id)"
-              compact
-              @adjust="emit('adjustTableau', player.id, $event)"
-              @set="emit('setTableau', player.id, $event)"
-            />
+          <div class="flex shrink-0 items-center gap-3">
+            <div class="flex w-[7.5rem] justify-center">
+              <EditableVpScore
+                :value="player.vpChips"
+                :vp-pool="vpPool"
+                :vp-pool-initial="vpPoolInitial"
+                :editable="canEditPlayer(player.id)"
+                compact
+                @adjust="emit('adjustVp', player.id, $event)"
+                @set="emit('setVp', player.id, $event)"
+              />
+            </div>
+            <div class="flex w-[7.5rem] justify-center">
+              <EditableEmpireScore
+                :value="player.empireSize"
+                :editable="canEditPlayer(player.id)"
+                compact
+                @adjust="emit('adjustEmpire', player.id, $event)"
+                @set="emit('setEmpire', player.id, $event)"
+              />
+            </div>
           </div>
         </div>
       </div>

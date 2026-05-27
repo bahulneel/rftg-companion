@@ -94,7 +94,7 @@ const podiumColors = ['text-star-400', 'text-slate-300', 'text-phase-consume']
           <template v-if="player.breakdown.tiebreakSubmitted">
             <p class="pt-1 text-xs uppercase tracking-wide text-slate-500">Tie-break counts</p>
             <div class="flex justify-between text-slate-400">
-              <span>Goods on Worlds</span><span class="text-slate-200">{{ player.breakdown.goodsOnWorlds }}</span>
+              <span>Goods on worlds</span><span class="text-slate-200">{{ player.breakdown.goodsOnWorlds }}</span>
             </div>
             <div class="flex justify-between text-slate-400">
               <span>Cards in Hand</span><span class="text-slate-200">{{ player.breakdown.cardsInHand }}</span>

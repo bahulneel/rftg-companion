@@ -96,8 +96,8 @@ export function isAuthorized(fromPeerId: string, action: GameAction, state: Game
 
     case 'ADJUST_VP':
     case 'SET_VP':
-    case 'ADJUST_TABLEAU':
-    case 'SET_TABLEAU':
+    case 'ADJUST_EMPIRE':
+    case 'SET_EMPIRE':
       return canEditVp(fromPeerId, isHost, action.playerId, state.players)
 
     case 'SET_TUTORIAL_ENABLED': {

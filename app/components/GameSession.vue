@@ -304,6 +304,8 @@ async function copyInviteLink() {
           @confirm="controller.confirmSelection()"
           @adjust-vp="controller.adjustVp"
           @set-vp="controller.setVp"
+          @adjust-empire="controller.adjustEmpire"
+          @set-empire="controller.setEmpire"
           @end-game="controller.endGame()"
         />
 
@@ -313,6 +315,8 @@ async function copyInviteLink() {
           @set-reveal-index="controller.setRevealIndex"
           @adjust-vp="controller.adjustVp"
           @set-vp="controller.setVp"
+          @adjust-empire="controller.adjustEmpire"
+          @set-empire="controller.setEmpire"
           @finish-round="controller.finishRevealRound()"
         />
 

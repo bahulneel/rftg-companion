@@ -5,7 +5,9 @@ import { buildRevealedPhases, getPhaseLimit } from '~/utils/phases'
 import { ownedPlayers } from '~/utils/permissions'
 import {
   applyVpTarget,
+  clampEmpireSize,
   defaultScoreInput,
+  EMPIRE_START_SIZE,
   vpPoolForPlayerCount,
 } from '~/utils/scoring'
 
@@ -36,7 +38,7 @@ function addPlayerToState(s: GameState, playerId: string, ownerPeerId: string, n
     ownerPeerId,
     name: name.trim() || 'Player',
     vpChips: 0,
-    tableauSize: 0,
+    empireSize: 0,
     tutorialEnabled: false,
     status: 'thinking',
   })
@@ -101,11 +103,15 @@ export const useGameStore = defineStore('game', () => {
     state.value = {
       ...newState,
       registeredPeerIds: newState.registeredPeerIds ?? [],
-      players: newState.players.map((player) => ({
-        ...player,
-        ownerPeerId: player.ownerPeerId ?? player.id,
-        tutorialEnabled: player.tutorialEnabled ?? false,
-      })),
+      players: newState.players.map((player) => {
+        const legacy = player as Player & { tableauSize?: number }
+        return {
+          ...player,
+          ownerPeerId: player.ownerPeerId ?? player.id,
+          tutorialEnabled: player.tutorialEnabled ?? false,
+          empireSize: player.empireSize ?? legacy.tableauSize ?? 0,
+        }
+      }),
       revealPhaseIndex: newState.revealPhaseIndex ?? 0,
       actionPickLimit:
         newState.actionPickLimit ?? getPhaseLimit(newState.players.length),
@@ -174,7 +180,7 @@ export const useGameStore = defineStore('game', () => {
         for (const player of s.players) {
           player.status = 'thinking'
           player.vpChips = 0
-          player.tableauSize = TABLEAU_START_SIZE
+          player.empireSize = EMPIRE_START_SIZE
           s.selections[player.id] = []
           s.confirmed[player.id] = false
           s.scores[player.id] = defaultScoreInput()
@@ -268,6 +274,24 @@ export const useGameStore = defineStore('game', () => {
         s.vpPool = result.vpPool
         s.lastRound = result.lastRound
         syncScoreVp(s, action.playerId, player.vpChips)
+        break
+      }
+
+      case 'ADJUST_EMPIRE': {
+        const player = s.players.find((entry) => entry.id === action.playerId)
+        if (!player) break
+        const next = clampEmpireSize(player.empireSize + action.delta)
+        if (next === player.empireSize) break
+        player.empireSize = next
+        break
+      }
+
+      case 'SET_EMPIRE': {
+        const player = s.players.find((entry) => entry.id === action.playerId)
+        if (!player) break
+        const next = clampEmpireSize(action.empireSize)
+        if (next === player.empireSize) break
+        player.empireSize = next
         break
       }
 

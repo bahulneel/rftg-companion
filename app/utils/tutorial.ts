@@ -7,7 +7,7 @@ export const TUTORIAL_GROUP_BLURBS: Record<PhaseDefinition['group'], string> = {
   develop:
     'Pay the cost to play a development from your hand. The bonus discounts one diamond development by 1 card.',
   settle:
-    'Play a world from your hand onto your tableau. Military worlds cost less; non-military may let you draw after.',
+    'Play a world from your hand into your empire. Military worlds cost less; non-military may let you draw after.',
   consume:
     'Trade a good for cards, then run consume powers for VP chips. ×2 doubles chip gains this phase.',
   produce:
