@@ -1,7 +1,8 @@
 import type { Expansions, GameScreen, PhaseId, Player } from '~/types/game'
 import type { GameTransport } from '~/composables/gameTransport'
 import { LOCAL_HOST_ID } from '~/composables/gameTransport'
-import type { CostModifier } from '~/types/game'
+import type { EmpireBonus } from '~/types/game'
+import { normalizeCostPlanning } from '~/utils/cardCost'
 import {
   canControlSession,
   canEditVp,
@@ -211,8 +212,8 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     dispatch({ type: 'SET_TUTORIAL_ENABLED', playerId, enabled })
   }
 
-  function setCostModifiers(playerId: string, modifiers: CostModifier[]) {
-    dispatch({ type: 'SET_COST_MODIFIERS', playerId, modifiers })
+  function setEmpireBonuses(playerId: string, bonuses: EmpireBonus[]) {
+    dispatch({ type: 'SET_EMPIRE_BONUSES', playerId, bonuses })
   }
 
   function submitTiebreak(goodsOnWorlds: number, cardsInHand: number) {
@@ -467,15 +468,15 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     showEndGame: canControlSession(store.isHost),
     canEditPlayer,
     primaryScorePlayerId: actingPlayerId.value ?? '',
-    costModifiers:
+    empireBonuses:
       actingPlayerId.value && store.state?.costPlanning?.[actingPlayerId.value]
-        ? store.state.costPlanning[actingPlayerId.value]!.modifiers
+        ? normalizeCostPlanning(store.state.costPlanning[actingPlayerId.value]).empireBonuses
         : [],
     showTutorialBlurbs: isPlayerTutorialEnabled(
       store.state?.players ?? [],
       actingPlayerId.value,
     ),
-    canEditCostPlanning: !!actingPlayerId.value && !store.isSpectator,
+    canEditEmpireBonuses: !!actingPlayerId.value && !store.isSpectator,
   }))
 
   const reveal = computed(() => ({
@@ -540,7 +541,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     endGame,
     submitTiebreak,
     setTutorialEnabled,
-    setCostModifiers,
+    setEmpireBonuses,
     initLocalSession,
   }
 }

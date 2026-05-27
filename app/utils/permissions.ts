@@ -106,8 +106,9 @@ export function isAuthorized(fromPeerId: string, action: GameAction, state: Game
       return player ? canSetTutorial(fromPeerId, isHost, player) : false
     }
 
+    case 'SET_EMPIRE_BONUSES':
     case 'SET_COST_MODIFIERS': {
-      if (state.screen !== 'select') return false
+      if (state.screen !== 'select' && state.screen !== 'reveal') return false
       const player = findPlayer(state, action.playerId)
       return player ? canActForPlayer(fromPeerId, player) : false
     }

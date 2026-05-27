@@ -306,9 +306,9 @@ async function copyInviteLink() {
           @set-vp="controller.setVp"
           @adjust-empire="controller.adjustEmpire"
           @set-empire="controller.setEmpire"
-          @update-cost-modifiers="(modifiers) => {
+          @update-empire-bonuses="(bonuses) => {
             const id = select.actingPlayer?.id
-            if (id) controller.setCostModifiers(id, modifiers)
+            if (id) controller.setEmpireBonuses(id, bonuses)
           }"
           @end-game="controller.endGame()"
         />

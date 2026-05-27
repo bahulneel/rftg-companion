@@ -13,15 +13,19 @@ export type PhaseId =
 
 export type GameScreen = 'lobby' | 'select' | 'reveal' | 'scoring'
 
-export interface CostModifier {
+/** Bonuses from cards in the player's empire — tracked across rounds. */
+export interface EmpireBonus {
   id: string
   label: string
   discardDelta: number
   militaryDelta: number
 }
 
+/** @deprecated Use EmpireBonus */
+export type CostModifier = EmpireBonus
+
 export interface PlayerCostPlanning {
-  modifiers: CostModifier[]
+  empireBonuses: EmpireBonus[]
 }
 
 export interface Expansions {
@@ -83,7 +87,7 @@ export interface GameState {
   lastRound: boolean
   gameEnded: boolean
   scores: Record<string, ScoreInput>
-  /** Per-player cost modifiers during secret planning (select phase). */
+  /** Per-player empire card bonuses (persist for the whole game). */
   costPlanning: Record<string, PlayerCostPlanning>
 }
 
@@ -107,4 +111,6 @@ export type GameAction =
   | { type: 'SUBMIT_TIEBREAK'; playerId: string; goodsOnWorlds: number; cardsInHand: number }
   | { type: 'SUBMIT_SCORE'; playerId: string; score: Partial<ScoreInput> }
   | { type: 'SET_TUTORIAL_ENABLED'; playerId: string; enabled: boolean }
-  | { type: 'SET_COST_MODIFIERS'; playerId: string; modifiers: CostModifier[] }
+  | { type: 'SET_EMPIRE_BONUSES'; playerId: string; bonuses: EmpireBonus[] }
+  /** @deprecated synced from older builds — mapped to SET_EMPIRE_BONUSES */
+  | { type: 'SET_COST_MODIFIERS'; playerId: string; modifiers: EmpireBonus[] }

@@ -1,6 +1,6 @@
-import type { CostModifier } from '~/types/game'
+import type { EmpireBonus } from '~/types/game'
 
-export type { CostModifier }
+export type { EmpireBonus }
 
 /** Building blocks that mirror symbols on RFTG card cost strips. */
 export type CostIconType = 'discard' | 'military' | 'or'
@@ -30,16 +30,61 @@ export interface CostCalculation {
   effectiveMilitary: number | null
 }
 
-export const COST_MODIFIER_PRESETS: Omit<CostModifier, 'id'>[] = [
-  { label: 'You chose Develop', discardDelta: -1, militaryDelta: 0 },
-  { label: 'You chose Settle (pay fewer cards)', discardDelta: -1, militaryDelta: 0 },
-  { label: 'You chose Settle (less military)', discardDelta: 0, militaryDelta: -1 },
-  { label: 'Levy on a world', discardDelta: -1, militaryDelta: 0 },
+/** Presets for bonuses from cards already in the player's empire. */
+export const EMPIRE_BONUS_PRESETS: Omit<EmpireBonus, 'id'>[] = [
+  { label: '−1 cost from a development', discardDelta: -1, militaryDelta: 0 },
+  { label: 'Levy on a world (−1 discard)', discardDelta: -1, militaryDelta: 0 },
   { label: '+1 military from a card', discardDelta: 0, militaryDelta: 1 },
+  { label: '−1 military from a card', discardDelta: 0, militaryDelta: -1 },
+  { label: 'Pay 1 more to play (penalty)', discardDelta: 1, militaryDelta: 0 },
 ]
 
+/** Phase you might call this round — shown in the calculator only, not stored. */
+export interface PhaseCostScenario {
+  id: string
+  label: string
+  discardDelta: number
+  militaryDelta: number
+  appliesWhen: 'discard' | 'military' | 'any'
+}
+
+export const PHASE_COST_SCENARIOS: PhaseCostScenario[] = [
+  {
+    id: 'develop',
+    label: 'If you call Develop',
+    discardDelta: -1,
+    militaryDelta: 0,
+    appliesWhen: 'discard',
+  },
+  {
+    id: 'settle-discard',
+    label: 'If you call Settle (pay with cards)',
+    discardDelta: -1,
+    militaryDelta: 0,
+    appliesWhen: 'discard',
+  },
+  {
+    id: 'settle-military',
+    label: 'If you call Settle (pay with military)',
+    discardDelta: 0,
+    militaryDelta: -1,
+    appliesWhen: 'military',
+  },
+]
+
+export interface CostBreakdown {
+  printed: CostCalculation
+  withEmpire: CostCalculation
+  phaseScenarios: Array<{
+    scenario: PhaseCostScenario
+    result: CostCalculation
+  }>
+  hasDiscardCost: boolean
+  hasMilitaryCost: boolean
+}
+
 /** Short plain-English summary for lists. */
-export function formatModifierSummary(mod: CostModifier): string {
+export function formatModifierSummary(mod: EmpireBonus): string {
   const parts: string[] = []
   if (mod.discardDelta < 0) {
     const n = Math.abs(mod.discardDelta)
@@ -63,20 +108,36 @@ export function newCostTokenId(): string {
   return `cost-${Date.now()}-${costTokenCounter}`
 }
 
-export function newCostModifierId(): string {
+export function newEmpireBonusId(): string {
   costTokenCounter += 1
-  return `mod-${Date.now()}-${costTokenCounter}`
+  return `bonus-${Date.now()}-${costTokenCounter}`
 }
 
-export function defaultCostPlanning(): { modifiers: CostModifier[] } {
-  return { modifiers: [] }
+/** @deprecated use newEmpireBonusId */
+export const newCostModifierId = newEmpireBonusId
+
+export function defaultCostPlanning(): PlayerCostPlanningShape {
+  return { empireBonuses: [] }
+}
+
+interface PlayerCostPlanningShape {
+  empireBonuses: EmpireBonus[]
+}
+
+export function normalizeCostPlanning(
+  planning: { empireBonuses?: EmpireBonus[]; modifiers?: EmpireBonus[] } | undefined,
+): PlayerCostPlanningShape {
+  if (!planning) return defaultCostPlanning()
+  return {
+    empireBonuses: planning.empireBonuses ?? planning.modifiers ?? [],
+  }
 }
 
 function applyModifierFloor(value: number): number {
   return Math.max(0, value)
 }
 
-export function sumModifierDeltas(modifiers: CostModifier[]): {
+export function sumModifierDeltas(modifiers: EmpireBonus[]): {
   discardDelta: number
   militaryDelta: number
   notes: string[]
@@ -123,10 +184,24 @@ function segmentTotals(segment: CostIconToken[]): {
   return { discardRequired, militaryRequired }
 }
 
-/** Read a composed icon strip and apply tracked modifiers. */
+function tokensHaveCostKind(tokens: CostIconToken[], kind: 'discard' | 'military'): boolean {
+  return tokens.some((token) => token.type === kind)
+}
+
+function scenarioApplies(
+  scenario: PhaseCostScenario,
+  hasDiscardCost: boolean,
+  hasMilitaryCost: boolean,
+): boolean {
+  if (scenario.appliesWhen === 'any') return hasDiscardCost || hasMilitaryCost
+  if (scenario.appliesWhen === 'discard') return hasDiscardCost
+  return hasMilitaryCost
+}
+
+/** Read a composed icon strip and apply modifier deltas. */
 export function calculateCost(
   tokens: CostIconToken[],
-  modifiers: CostModifier[],
+  modifiers: EmpireBonus[] = [],
 ): CostCalculation {
   const { discardDelta, militaryDelta, notes } = sumModifierDeltas(modifiers)
   const segments = splitCostSegments(tokens)
@@ -157,5 +232,39 @@ export function calculateCost(
     effectiveDiscard: first?.effectiveDiscard ?? null,
     effectiveMilitary: first?.effectiveMilitary ?? null,
     modifierNotes: notes,
+  }
+}
+
+/** Printed cost, empire-adjusted cost, and optional phase scenarios for planning. */
+export function calculateCostBreakdown(
+  tokens: CostIconToken[],
+  empireBonuses: EmpireBonus[],
+): CostBreakdown {
+  const printed = calculateCost(tokens, [])
+  const withEmpire = calculateCost(tokens, empireBonuses)
+  const hasDiscardCost = tokensHaveCostKind(tokens, 'discard')
+  const hasMilitaryCost = tokensHaveCostKind(tokens, 'military')
+
+  const phaseScenarios = PHASE_COST_SCENARIOS.filter((scenario) =>
+    scenarioApplies(scenario, hasDiscardCost, hasMilitaryCost),
+  ).map((scenario) => ({
+    scenario,
+    result: calculateCost(tokens, [
+      ...empireBonuses,
+      {
+        id: scenario.id,
+        label: scenario.label,
+        discardDelta: scenario.discardDelta,
+        militaryDelta: scenario.militaryDelta,
+      },
+    ]),
+  }))
+
+  return {
+    printed,
+    withEmpire,
+    phaseScenarios,
+    hasDiscardCost,
+    hasMilitaryCost,
   }
 }

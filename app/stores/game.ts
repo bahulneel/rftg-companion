@@ -1,6 +1,7 @@
 import { toRaw } from 'vue'
 import { defineStore } from 'pinia'
 import type { Expansions, GameAction, GameState, PhaseId, Player, ScoreInput } from '~/types/game'
+import { normalizeCostPlanning } from '~/utils/cardCost'
 import { buildRevealedPhases, getPhaseLimit } from '~/utils/phases'
 import { ownedPlayers } from '~/utils/permissions'
 import {
@@ -122,7 +123,12 @@ export const useGameStore = defineStore('game', () => {
           { ...score, tiebreakSubmitted: score.tiebreakSubmitted ?? false },
         ]),
       ),
-      costPlanning: newState.costPlanning ?? {},
+      costPlanning: Object.fromEntries(
+        Object.entries(newState.costPlanning ?? {}).map(([playerId, planning]) => [
+          playerId,
+          normalizeCostPlanning(planning),
+        ]),
+      ),
     }
   }
 
@@ -187,7 +193,7 @@ export const useGameStore = defineStore('game', () => {
           s.selections[player.id] = []
           s.confirmed[player.id] = false
           s.scores[player.id] = defaultScoreInput()
-          s.costPlanning[player.id] = { modifiers: [] }
+          s.costPlanning[player.id] = { empireBonuses: [] }
         }
         break
       }
@@ -232,7 +238,7 @@ export const useGameStore = defineStore('game', () => {
           player.status = 'thinking'
           s.selections[player.id] = []
           s.confirmed[player.id] = false
-          s.costPlanning[player.id] = s.costPlanning[player.id] ?? { modifiers: [] }
+          s.costPlanning[player.id] = normalizeCostPlanning(s.costPlanning[player.id])
         }
         break
       }
@@ -334,9 +340,12 @@ export const useGameStore = defineStore('game', () => {
         break
       }
 
+      case 'SET_EMPIRE_BONUSES':
       case 'SET_COST_MODIFIERS': {
-        if (s.screen !== 'select') break
-        s.costPlanning[action.playerId] = { modifiers: action.modifiers }
+        if (s.screen !== 'select' && s.screen !== 'reveal') break
+        const bonuses =
+          action.type === 'SET_EMPIRE_BONUSES' ? action.bonuses : action.modifiers
+        s.costPlanning[action.playerId] = { empireBonuses: bonuses }
         break
       }
     }
