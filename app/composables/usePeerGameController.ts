@@ -5,6 +5,7 @@ import {
   canControlSession,
   canEditVp,
   canReorder,
+  canSetTutorial,
   ownedPlayers,
 } from '~/utils/permissions'
 import {
@@ -194,6 +195,10 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
 
   function endGame() {
     dispatch({ type: 'END_GAME' })
+  }
+
+  function setTutorialEnabled(playerId: string, enabled: boolean) {
+    dispatch({ type: 'SET_TUTORIAL_ENABLED', playerId, enabled })
   }
 
   function submitTiebreak(goodsOnWorlds: number, cardsInHand: number) {
@@ -509,6 +514,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     finishRevealRound,
     endGame,
     submitTiebreak,
+    setTutorialEnabled,
     initLocalSession,
   }
 }

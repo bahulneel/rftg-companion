@@ -21,6 +21,7 @@ const props = defineProps<{
   expansionsEditable: boolean
   hint: string
   newPlayerName: string
+  canSetTutorialForPlayer?: (playerId: string) => boolean
 }>()
 
 const emit = defineEmits<{
@@ -109,7 +110,9 @@ const showHint = computed(() => props.hint && !props.showHostJoinChoice)
       :reorderable="canReorder"
       :show-order="canReorder"
       :show-host-row="isHost && isSpectator && !showHostJoinChoice"
+      :can-set-tutorial-for-player="canSetTutorialForPlayer"
       @reorder="emit('reorder', $event)"
+      @set-tutorial-enabled="(playerId, enabled) => emit('setTutorialEnabled', playerId, enabled)"
     />
 
     <div v-if="canManageRoster && !showHostJoinChoice" class="space-y-3">

@@ -10,6 +10,7 @@ const props = defineProps<{
   showOrder?: boolean
   showHostRow?: boolean
   preview?: boolean
+  canSetTutorialForPlayer?: (playerId: string) => boolean
 }>()
 
 const pendingPeerIds = computed(() => props.pendingPeerIds ?? [])
@@ -18,7 +19,12 @@ const totalCount = computed(() => props.players.length + pendingPeerIds.value.le
 
 const emit = defineEmits<{
   reorder: [playerIds: string[]]
+  setTutorialEnabled: [playerId: string, enabled: boolean]
 }>()
+
+function canToggleTutorial(player: Player): boolean {
+  return props.canSetTutorialForPlayer?.(player.id) ?? false
+}
 
 const dragId = ref<string | null>(null)
 const overId = ref<string | null>(null)

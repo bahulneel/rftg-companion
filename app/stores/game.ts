@@ -36,6 +36,8 @@ function addPlayerToState(s: GameState, playerId: string, ownerPeerId: string, n
     ownerPeerId,
     name: name.trim() || 'Player',
     vpChips: 0,
+    tableauSize: 0,
+    tutorialEnabled: false,
     status: 'thinking',
   })
   s.selections[playerId] = []
@@ -102,6 +104,7 @@ export const useGameStore = defineStore('game', () => {
       players: newState.players.map((player) => ({
         ...player,
         ownerPeerId: player.ownerPeerId ?? player.id,
+        tutorialEnabled: player.tutorialEnabled ?? false,
       })),
       revealPhaseIndex: newState.revealPhaseIndex ?? 0,
       actionPickLimit:
@@ -292,6 +295,13 @@ export const useGameStore = defineStore('game', () => {
           vpChips: s.players.find((entry) => entry.id === action.playerId)?.vpChips ?? existing.vpChips,
           submitted: true,
         }
+        break
+      }
+
+      case 'SET_TUTORIAL_ENABLED': {
+        if (s.screen !== 'lobby') break
+        const player = s.players.find((entry) => entry.id === action.playerId)
+        if (player) player.tutorialEnabled = action.enabled
         break
       }
     }
