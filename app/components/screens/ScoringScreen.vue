@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Expansions } from '~/types/game'
 import type { RankedPlayer } from '~/utils/scoring'
+import { getRulesHints } from '~/utils/rulesHints'
 
 defineProps<{
   needsTiebreak: boolean
@@ -19,6 +20,8 @@ const emit = defineEmits<{
   ready: []
   submitTiebreak: [goodsOnWorlds: number, cardsInHand: number]
 }>()
+
+const scoringHints = getRulesHints('scoring')
 </script>
 
 <template>

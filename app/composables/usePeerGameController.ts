@@ -6,6 +6,7 @@ import { normalizeCostPlanning } from '~/utils/cardCost'
 import {
   canControlSession,
   canEditVp,
+  canRemovePlayer,
   canReorder,
   canSetTutorial,
   ownedPlayers,
@@ -143,6 +144,10 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     dispatch({ type: 'REORDER_PLAYERS', playerIds })
   }
 
+  function removePlayer(playerId: string) {
+    dispatch({ type: 'REMOVE_PLAYER', playerId })
+  }
+
   function startGame() {
     dispatch({ type: 'START_GAME' })
   }
@@ -170,7 +175,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     if (!playerId) return
     dispatch({ type: 'CONFIRM', playerId })
     if (usesPassAndPlay.value && store.state?.screen === 'select') {
-      finishPlayerTurn(myOwnedPlayers.value, (id) => store.state!.confirmed[id])
+      finishPlayerTurn(myOwnedPlayers.value, (id) => store.state!.confirmed[id] ?? false)
       draftSelections.value = []
     }
   }
@@ -237,7 +242,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     if (!store.state) return
 
     if (store.state.screen === 'select' && usesPassAndPlay.value) {
-      resetForPlayers(myOwnedPlayers.value, (id) => store.state!.confirmed[id])
+      resetForPlayers(myOwnedPlayers.value, (id) => store.state!.confirmed[id] ?? false)
       draftSelections.value = []
     } else if (store.state.screen === 'scoring' && usesPassAndPlay.value) {
       if (needsTiebreakInput(store.state.players, store.state.scores, store.state.expansions)) {
@@ -439,6 +444,12 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
       if (!player) return false
       return canSetTutorial(options.peerId.value, store.isHost, player)
     },
+    canRemovePlayer: (playerId: string) => {
+      if (!store.state || store.state.screen !== 'lobby') return false
+      const player = store.state.players.find((entry) => entry.id === playerId)
+      if (!player) return false
+      return canRemovePlayer(options.peerId.value, store.isHost, player)
+    },
   }))
 
   const select = computed(() => ({
@@ -527,6 +538,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     registerAsGameMaster,
     registerAsPlayerPeer,
     reorderPlayers,
+    removePlayer,
     startGame,
     updateExpansions,
     selectPhases,

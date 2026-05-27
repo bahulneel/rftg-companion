@@ -84,7 +84,7 @@ export interface CostBreakdown {
 }
 
 /** Short plain-English summary for lists. */
-export function formatModifierSummary(mod: EmpireBonus): string {
+export function formatModifierSummary(mod: Pick<EmpireBonus, 'discardDelta' | 'militaryDelta'>): string {
   const parts: string[] = []
   if (mod.discardDelta < 0) {
     const n = Math.abs(mod.discardDelta)

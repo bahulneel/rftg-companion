@@ -48,6 +48,16 @@ function addPlayerToState(s: GameState, playerId: string, ownerPeerId: string, n
   s.scores[playerId] = defaultScoreInput()
 }
 
+function removePlayerFromState(s: GameState, playerId: string) {
+  const index = s.players.findIndex((player) => player.id === playerId)
+  if (index < 0) return
+  s.players.splice(index, 1)
+  delete s.selections[playerId]
+  delete s.confirmed[playerId]
+  delete s.scores[playerId]
+  delete s.costPlanning[playerId]
+}
+
 function createInitialState(code: string, hostId: string): GameState {
   return {
     code,
@@ -158,6 +168,11 @@ export const useGameStore = defineStore('game', () => {
         }
         break
 
+      case 'REMOVE_PLAYER':
+        if (s.screen !== 'lobby') break
+        removePlayerFromState(s, action.playerId)
+        break
+
       case 'SET_NAME': {
         const player = s.players.find((entry) => entry.id === action.playerId)
         if (player) player.name = action.name.trim() || 'Player'
@@ -167,7 +182,9 @@ export const useGameStore = defineStore('game', () => {
       case 'REORDER_PLAYERS': {
         if (s.screen !== 'lobby') break
         const byId = Object.fromEntries(s.players.map((player) => [player.id, player]))
-        const reordered = action.playerIds.map((id) => byId[id]).filter(Boolean)
+        const reordered = action.playerIds
+          .map((id) => byId[id])
+          .filter((player): player is Player => !!player)
         if (reordered.length !== s.players.length) break
         s.players = reordered
         break

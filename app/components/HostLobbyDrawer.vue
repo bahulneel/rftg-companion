@@ -25,12 +25,15 @@ defineProps<{
   expansionsEditable: boolean
   hint: string
   newPlayerName: string
+  canSetTutorialForPlayer?: (playerId: string) => boolean
+  canRemovePlayer?: (playerId: string) => boolean
 }>()
 
 const emit = defineEmits<{
   'update:open': [value: boolean]
   'update:newPlayerName': [value: string]
   reorder: [playerIds: string[]]
+  removePlayer: [playerId: string]
   addPlayer: []
   registerAsSpectator: []
   registerAsGameMaster: []
@@ -38,6 +41,7 @@ const emit = defineEmits<{
   startGame: []
   'update:expansions': [value: Expansions]
   copyInvite: []
+  setTutorialEnabled: [playerId: string, enabled: boolean]
 }>()
 
 function close() {
@@ -146,8 +150,10 @@ function close() {
           :hint="hint"
           :new-player-name="newPlayerName"
           :can-set-tutorial-for-player="canSetTutorialForPlayer"
+          :can-remove-player="canRemovePlayer"
           @update:new-player-name="emit('update:newPlayerName', $event)"
           @reorder="emit('reorder', $event)"
+          @remove-player="emit('removePlayer', $event)"
           @add-player="emit('addPlayer')"
           @register-as-spectator="emit('registerAsSpectator')"
           @register-as-game-master="emit('registerAsGameMaster')"

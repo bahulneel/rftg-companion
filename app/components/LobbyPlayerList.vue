@@ -11,6 +11,7 @@ const props = defineProps<{
   showHostRow?: boolean
   preview?: boolean
   canSetTutorialForPlayer?: (playerId: string) => boolean
+  canRemovePlayer?: (playerId: string) => boolean
 }>()
 
 const pendingPeerIds = computed(() => props.pendingPeerIds ?? [])
@@ -19,6 +20,7 @@ const totalCount = computed(() => props.players.length + pendingPeerIds.value.le
 
 const emit = defineEmits<{
   reorder: [playerIds: string[]]
+  remove: [playerId: string]
   setTutorialEnabled: [playerId: string, enabled: boolean]
 }>()
 
@@ -36,6 +38,22 @@ function reorder(sourceId: string, targetId: string) {
   ids.splice(from, 1)
   ids.splice(to, 0, sourceId)
   emit('reorder', ids)
+}
+
+function movePlayer(playerId: string, delta: number) {
+  const ids = props.players.map((player) => player.id)
+  const from = ids.indexOf(playerId)
+  const to = from + delta
+  if (from < 0 || to < 0 || to >= ids.length) return
+  reorder(playerId, ids[to]!)
+}
+
+function canMove(playerId: string, delta: number): boolean {
+  const ids = props.players.map((player) => player.id)
+  const index = ids.indexOf(playerId)
+  if (index < 0) return false
+  const destination = index + delta
+  return destination >= 0 && destination < ids.length
 }
 
 function onDragStart(playerId: string, event: DragEvent) {
@@ -69,6 +87,18 @@ function onDragEnd() {
 function isOwnPlayer(player: Player): boolean {
   return !!props.peerId && player.ownerPeerId === props.peerId
 }
+
+function canRemovePlayer(playerId: string): boolean {
+  return props.canRemovePlayer?.(playerId) ?? false
+}
+
+function removePlayer(player: Player) {
+  if (!canRemovePlayer(player.id)) return
+  const confirmed = import.meta.client
+    ? window.confirm(`Remove ${player.name} from the lobby?`)
+    : true
+  if (confirmed) emit('remove', player.id)
+}
 </script>
 
 <template>
@@ -86,7 +116,7 @@ function isOwnPlayer(player: Player): boolean {
       Peers are connecting — add players on this device below.
     </p>
     <p v-else-if="reorderable" class="mb-3 text-xs text-slate-500">
-      Drag to set turn order — first player picks phases first each round.
+      Drag or use arrow buttons to set turn order — first player picks phases first each round.
     </p>
     <ul class="space-y-2" role="list">
       <li
@@ -102,7 +132,7 @@ function isOwnPlayer(player: Player): boolean {
       <li
         v-for="(player, index) in players"
         :key="player.id"
-        class="flex items-center gap-3 rounded-lg bg-space-800/50 px-3 py-2 transition"
+        class="flex touch-manipulation items-center gap-3 rounded-lg bg-space-800/50 px-3 py-2 transition"
         :class="{
           'ring-1 ring-nebula-400/50': overId === player.id && dragId !== player.id,
           'opacity-50': dragId === player.id,
@@ -118,8 +148,28 @@ function isOwnPlayer(player: Player): boolean {
           class="cursor-grab select-none text-slate-500 active:cursor-grabbing"
           aria-hidden="true"
         >
-          ⠿
+          ↕
         </span>
+        <div v-if="reorderable" class="flex shrink-0 items-center gap-1">
+          <button
+            type="button"
+            class="rounded-md border border-space-600 px-2 py-1 text-xs text-slate-300 transition enabled:hover:border-nebula-400 disabled:opacity-40"
+            :disabled="!canMove(player.id, -1)"
+            :aria-label="`Move ${player.name} earlier`"
+            @click="movePlayer(player.id, -1)"
+          >
+            ↑
+          </button>
+          <button
+            type="button"
+            class="rounded-md border border-space-600 px-2 py-1 text-xs text-slate-300 transition enabled:hover:border-nebula-400 disabled:opacity-40"
+            :disabled="!canMove(player.id, 1)"
+            :aria-label="`Move ${player.name} later`"
+            @click="movePlayer(player.id, 1)"
+          >
+            ↓
+          </button>
+        </div>
         <span v-if="showOrder" class="w-5 shrink-0 text-center text-xs font-semibold text-slate-500">
           {{ index + 1 }}
         </span>
@@ -139,6 +189,15 @@ function isOwnPlayer(player: Player): boolean {
         </label>
         <span v-else-if="player.tutorialEnabled" class="shrink-0 text-xs text-nebula-400/80">Tutorial</span>
         <span v-if="isOwnPlayer(player)" class="shrink-0 text-xs text-nebula-400">This device</span>
+        <button
+          v-if="canRemovePlayer(player.id)"
+          type="button"
+          class="shrink-0 rounded-md border border-red-500/40 px-2 py-1 text-xs text-red-200 transition hover:border-red-400 hover:text-red-100"
+          :aria-label="`Remove ${player.name}`"
+          @click="removePlayer(player)"
+        >
+          Remove
+        </button>
       </li>
       <li
         v-for="(pendingId, index) in pendingPeerIds"
