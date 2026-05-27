@@ -58,6 +58,8 @@ export interface GameState {
   registeredPeerIds: string[]
   expansions: Expansions
   round: number
+  /** Action cards each player may select per round (1 standard, 2 experienced 2-player). */
+  actionPickLimit: number
   selections: Record<string, PhaseId[]>
   confirmed: Record<string, boolean>
   revealedPhases: RevealedPhase[]

@@ -116,12 +116,22 @@ export const PHASE_ORDER: PhaseId[] = [
   'repair',
 ]
 
-export function getAvailablePhases(expansions: Expansions): PhaseDefinition[] {
-  return PHASES.filter((p) => !p.requiresExpansion || expansions[p.requiresExpansion])
+const EXPERIENCED_TWO_PLAYER_PHASE_IDS: PhaseId[] = ['develop-2', 'settle-2']
+
+export function getAvailablePhases(expansions: Expansions, playerCount: number): PhaseDefinition[] {
+  const experiencedTwoPlayer = Number(playerCount) === 2
+  return PHASES.filter((phase) => {
+    if (!experiencedTwoPlayer && EXPERIENCED_TWO_PLAYER_PHASE_IDS.includes(phase.id)) {
+      return false
+    }
+    if (phase.requiresExpansion && !expansions[phase.requiresExpansion]) return false
+    return true
+  })
 }
 
+/** RFTG 2e: 1 action per player (standard); 2 each in experienced 2-player. */
 export function getPhaseLimit(playerCount: number): number {
-  return playerCount === 2 ? 2 : 1
+  return Number(playerCount) === 2 ? 2 : 1
 }
 
 export function getPhaseById(id: PhaseId): PhaseDefinition {

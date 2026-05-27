@@ -57,6 +57,7 @@ function createInitialState(code: string, hostId: string): GameState {
       goals: false,
     },
     round: 0,
+    actionPickLimit: 1,
     selections: {},
     confirmed: {},
     revealedPhases: [],
@@ -103,6 +104,8 @@ export const useGameStore = defineStore('game', () => {
         ownerPeerId: player.ownerPeerId ?? player.id,
       })),
       revealPhaseIndex: newState.revealPhaseIndex ?? 0,
+      actionPickLimit:
+        newState.actionPickLimit ?? getPhaseLimit(newState.players.length),
       scores: Object.fromEntries(
         Object.entries(newState.scores).map(([id, score]) => [
           id,
@@ -160,6 +163,7 @@ export const useGameStore = defineStore('game', () => {
       case 'START_GAME': {
         s.screen = 'select'
         s.round = 1
+        s.actionPickLimit = getPhaseLimit(s.players.length)
         s.vpPoolInitial = vpPoolForPlayerCount(s.players.length)
         s.vpPool = s.vpPoolInitial
         s.lastRound = false
@@ -175,7 +179,7 @@ export const useGameStore = defineStore('game', () => {
       }
 
       case 'SELECT_PHASES': {
-        const limit = getPhaseLimit(s.players.length)
+        const limit = s.actionPickLimit ?? getPhaseLimit(s.players.length)
         s.selections[action.playerId] = action.phases.slice(0, limit)
         const player = s.players.find((entry) => entry.id === action.playerId)
         if (player && s.confirmed[action.playerId]) {
@@ -186,7 +190,7 @@ export const useGameStore = defineStore('game', () => {
       }
 
       case 'CONFIRM': {
-        const limit = getPhaseLimit(s.players.length)
+        const limit = s.actionPickLimit ?? getPhaseLimit(s.players.length)
         const sel = s.selections[action.playerId] ?? []
         if (sel.length !== limit) break
 

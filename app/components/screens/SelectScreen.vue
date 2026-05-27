@@ -14,6 +14,7 @@ defineProps<{
   confirmed: boolean
   expansions: Expansions
   playerCount: number
+  actionPickLimit: number
   highlightPlayerId: string
   vp: {
     pool: number
@@ -66,6 +67,7 @@ const emit = defineEmits<{
       <PhasePicker
         :expansions="expansions"
         :player-count="playerCount"
+        :action-pick-limit="actionPickLimit"
         :selected="selections"
         :locked="confirmed"
         @update="emit('updateSelections', $event)"
