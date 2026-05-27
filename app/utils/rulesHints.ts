@@ -20,7 +20,7 @@ export function getRulesHints(
   switch (screen) {
     case 'lobby':
       return [
-        { text: 'Everything in the game is a card — circles are planets, diamonds are developments.' },
+        { text: 'Everything in the game is a card — planets and developments are both cards in your tableau.' },
         { text: 'Each round, players secretly choose action card(s); only chosen phases happen.' },
         { text: 'At round end, discard down to 10 cards in hand (face-down).' },
         { text: 'Game ends when a player has 12+ cards in their empire or the VP chip supply runs out — finish that round.' },
@@ -33,12 +33,14 @@ export function getRulesHints(
         { text: 'If several players pick the same phase, it still runs once — each chooser gets that phase’s bonus.' },
         { text: 'Phases resolve in order: Explore → Develop → Settle → Consume → Produce.' },
         { text: 'Pay costs by discarding hand cards as money; cargo is face-down under your planets.' },
+        { text: 'If Trade is selected, use the Trade quick reference for cargo-specific card rates.' },
         { text: 'After phases end, everyone discards to a 10-card hand limit before the next round.' },
       ]
     case 'reveal':
       return [
         { text: 'Resolve phases in order (Explore through Produce). Skip phases no one chose.' },
         { text: 'Everyone may act in each phase; only the player(s) who chose it get the bonus.' },
+        { text: 'If Trade is selected, use the Trade quick reference for cargo-specific card rates.' },
         { text: 'Round end: discard to 10 cards in hand, then reclaim your action card(s).' },
         { text: 'Empire limit: 12+ cards in a player’s empire can end the game that round.' },
       ]
@@ -47,11 +49,11 @@ export function getRulesHints(
         { text: 'VP chips and hand sizes are open information — others may ask to see them.' },
         { text: 'When chips in the supply are gone, finish the round; use 10-value chips if needed in the final Consume.' },
         { text: 'Track empire size here (your start world counts as 1). Game ends at 12+ cards or when total VP chips taken exceed the pool.' },
-        { text: 'Chip VP here is separate from VP printed on cards — count circle and diamond VP at game end.' },
+        { text: 'Chip VP here is separate from VP printed on cards — add VP printed on all worlds/developments at game end.' },
       ]
     case 'scoring':
       return [
-        { text: 'Final score: VP on your cards + VP chips + any end-game development bonuses (e.g. 6-cost diamonds).' },
+        { text: 'Final score: VP on your cards + VP chips + any end-game development bonuses (e.g. 6-cost developments).' },
         { text: 'Tie-breaker: most cargo on planets, then most cards in hand.' },
       ]
     default:

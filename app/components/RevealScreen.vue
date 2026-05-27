@@ -1,6 +1,7 @@
 <script setup lang="ts">
 import type { Player, RevealedPhase } from '~/types/game'
 import { getPhaseById } from '~/utils/phases'
+import { getRulesHints } from '~/utils/rulesHints'
 import {
   EMPIRE_END_GAME_SIZE,
   getEndGameTriggers,
@@ -55,6 +56,7 @@ const endGameMessage = computed(() => {
   return `${parts.join(' and ')} — finish this round for final standings`
 })
 const empireEndTriggered = computed(() => endGameTriggers.value.includes('empire'))
+const revealHints = getRulesHints('reveal')
 
 function goNext() {
   if (isLastPhase.value) {
@@ -82,6 +84,11 @@ function goNext() {
     </div>
 
     <RulesHint :items="revealHints" class="mb-2" />
+
+    <TradeRateReference
+      v-if="currentPhase?.id === 'consume-trade'"
+      class="mb-2"
+    />
 
     <div class="rounded-xl border border-space-600 bg-space-800/50 p-4">
       <div class="flex justify-between text-sm">

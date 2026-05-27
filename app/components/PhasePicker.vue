@@ -56,6 +56,8 @@ const selectedTutorialBlurb = computed(() => {
   const group = getPhaseById(lastId).group
   return TUTORIAL_GROUP_BLURBS[group] ?? null
 })
+
+const showTradeRates = computed(() => props.selected.includes('consume-trade'))
 </script>
 
 <template>
@@ -116,6 +118,7 @@ const selectedTutorialBlurb = computed(() => {
       >
         {{ selectedTutorialBlurb }}
       </p>
+      <TradeRateReference v-if="showTradeRates" />
 
       <div class="grid grid-cols-2 gap-2">
         <button
