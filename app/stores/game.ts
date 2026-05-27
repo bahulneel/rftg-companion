@@ -48,6 +48,16 @@ function addPlayerToState(s: GameState, playerId: string, ownerPeerId: string, n
   s.scores[playerId] = defaultScoreInput()
 }
 
+function removePlayerFromState(s: GameState, playerId: string) {
+  const index = s.players.findIndex((player) => player.id === playerId)
+  if (index < 0) return
+  s.players.splice(index, 1)
+  delete s.selections[playerId]
+  delete s.confirmed[playerId]
+  delete s.scores[playerId]
+  delete s.costPlanning[playerId]
+}
+
 function createInitialState(code: string, hostId: string): GameState {
   return {
     code,
@@ -156,6 +166,11 @@ export const useGameStore = defineStore('game', () => {
         if (!s.registeredPeerIds.includes(action.ownerPeerId)) {
           s.registeredPeerIds.push(action.ownerPeerId)
         }
+        break
+
+      case 'REMOVE_PLAYER':
+        if (s.screen !== 'lobby') break
+        removePlayerFromState(s, action.playerId)
         break
 
       case 'SET_NAME': {

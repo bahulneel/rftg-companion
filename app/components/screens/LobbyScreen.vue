@@ -22,11 +22,13 @@ const props = defineProps<{
   hint: string
   newPlayerName: string
   canSetTutorialForPlayer?: (playerId: string) => boolean
+  canRemovePlayer?: (playerId: string) => boolean
 }>()
 
 const emit = defineEmits<{
   'update:newPlayerName': [value: string]
   reorder: [playerIds: string[]]
+  removePlayer: [playerId: string]
   addPlayer: []
   registerAsSpectator: []
   registerAsGameMaster: []
@@ -111,7 +113,9 @@ const showHint = computed(() => props.hint && !props.showHostJoinChoice)
       :show-order="canReorder"
       :show-host-row="isHost && isSpectator && !showHostJoinChoice"
       :can-set-tutorial-for-player="canSetTutorialForPlayer"
+      :can-remove-player="canRemovePlayer"
       @reorder="emit('reorder', $event)"
+      @remove="emit('removePlayer', $event)"
       @set-tutorial-enabled="(playerId, enabled) => emit('setTutorialEnabled', playerId, enabled)"
     />
 

@@ -20,6 +20,10 @@ export function canAddPlayer(fromPeerId: string, ownerPeerId: string): boolean {
   return fromPeerId === ownerPeerId
 }
 
+export function canRemovePlayer(fromPeerId: string, isHost: boolean, player: Player): boolean {
+  return isHost || player.ownerPeerId === fromPeerId
+}
+
 export function canActForPlayer(fromPeerId: string, player: Player): boolean {
   return player.ownerPeerId === fromPeerId
 }
@@ -70,6 +74,12 @@ export function isAuthorized(fromPeerId: string, action: GameAction, state: Game
       if (!canAddPlayer(fromPeerId, action.ownerPeerId)) return false
       if (state.players.some((player) => player.id === action.playerId)) return false
       return true
+    }
+
+    case 'REMOVE_PLAYER': {
+      if (state.screen !== 'lobby') return false
+      const player = findPlayer(state, action.playerId)
+      return player ? canRemovePlayer(fromPeerId, isHost, player) : false
     }
 
     case 'SET_NAME': {

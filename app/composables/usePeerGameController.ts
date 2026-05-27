@@ -6,6 +6,7 @@ import { normalizeCostPlanning } from '~/utils/cardCost'
 import {
   canControlSession,
   canEditVp,
+  canRemovePlayer,
   canReorder,
   canSetTutorial,
   ownedPlayers,
@@ -141,6 +142,10 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
 
   function reorderPlayers(playerIds: string[]) {
     dispatch({ type: 'REORDER_PLAYERS', playerIds })
+  }
+
+  function removePlayer(playerId: string) {
+    dispatch({ type: 'REMOVE_PLAYER', playerId })
   }
 
   function startGame() {
@@ -439,6 +444,12 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
       if (!player) return false
       return canSetTutorial(options.peerId.value, store.isHost, player)
     },
+    canRemovePlayer: (playerId: string) => {
+      if (!store.state || store.state.screen !== 'lobby') return false
+      const player = store.state.players.find((entry) => entry.id === playerId)
+      if (!player) return false
+      return canRemovePlayer(options.peerId.value, store.isHost, player)
+    },
   }))
 
   const select = computed(() => ({
@@ -527,6 +538,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     registerAsGameMaster,
     registerAsPlayerPeer,
     reorderPlayers,
+    removePlayer,
     startGame,
     updateExpansions,
     selectPhases,

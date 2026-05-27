@@ -95,6 +95,7 @@ export type GameAction =
   | { type: 'SYNC_STATE'; state: GameState }
   | { type: 'REGISTER_PEER'; peerId: string }
   | { type: 'ADD_PLAYER'; playerId: string; ownerPeerId: string; name: string }
+  | { type: 'REMOVE_PLAYER'; playerId: string }
   | { type: 'SET_NAME'; playerId: string; name: string }
   | { type: 'REORDER_PLAYERS'; playerIds: string[] }
   | { type: 'SET_EXPANSIONS'; expansions: Expansions }
