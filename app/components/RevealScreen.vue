@@ -164,38 +164,19 @@ function goNext() {
         </div>
       </div>
 
-      <div class="space-y-2 rounded-xl border border-space-600 bg-space-800/30 p-4">
-        <p class="text-xs uppercase tracking-wide text-slate-400">Current scores</p>
-        <div
-          v-for="player in players"
-          :key="player.id"
-          class="flex items-center justify-between"
-        >
-          <span
-            :class="player.id === highlightPlayerId ? 'text-nebula-300 font-medium' : 'text-slate-300'"
-          >
-            {{ player.name }}
-          </span>
-          <div class="flex items-center gap-3">
-            <EditableVpScore
-              :value="player.vpChips"
-              :vp-pool="vpPool"
-              :vp-pool-initial="vpPoolInitial"
-              :editable="canEditPlayer(player.id)"
-              compact
-              @adjust="emit('adjustVp', player.id, $event)"
-              @set="emit('setVp', player.id, $event)"
-            />
-            <EditableTableauScore
-              :value="player.tableauSize"
-              :editable="canEditPlayer(player.id)"
-              compact
-              @adjust="emit('adjustTableau', player.id, $event)"
-              @set="emit('setTableau', player.id, $event)"
-            />
-          </div>
-        </div>
-      </div>
+      <PlayerScoreList
+        title="Current scores"
+        bordered
+        :players="players"
+        :highlight-player-id="highlightPlayerId"
+        :vp-pool="vpPool"
+        :vp-pool-initial="vpPoolInitial"
+        :can-edit-player="canEditPlayer"
+        @adjust-vp="(id, delta) => emit('adjustVp', id, delta)"
+        @set-vp="(id, value) => emit('setVp', id, value)"
+        @adjust-tableau="(id, delta) => emit('adjustTableau', id, delta)"
+        @set-tableau="(id, value) => emit('setTableau', id, value)"
+      />
 
       <div class="flex gap-3">
         <button
