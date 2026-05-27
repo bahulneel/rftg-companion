@@ -66,6 +66,8 @@ const poolPercent = computed(() =>
           </button>
         </div>
 
+        <RulesHint :items="vpHints" class="mb-4" />
+
         <div class="mb-4 rounded-xl border border-space-600 bg-space-800/50 p-4">
           <div class="flex justify-between text-sm">
             <span class="text-slate-400">Global VP Pool</span>
