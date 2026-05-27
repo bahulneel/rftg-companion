@@ -81,6 +81,36 @@ export function clampVpChips(value: number): number {
   return Math.max(0, Math.floor(value))
 }
 
+/** RFTG: each player starts with one face-up start world in tableau. */
+export const TABLEAU_START_SIZE = 1
+
+/** Game ends after the round in which any player has this many+ face-up tableau cards. */
+export const TABLEAU_END_GAME_SIZE = 12
+
+export function clampTableauSize(value: number): number {
+  return Math.max(0, Math.floor(value))
+}
+
+export function canAdjustTableau(current: number, delta: number): boolean {
+  return current + delta >= 0
+}
+
+export function hasTableauEndGameTrigger(players: Player[]): boolean {
+  return players.some((player) => player.tableauSize >= TABLEAU_END_GAME_SIZE)
+}
+
+export type EndGameTrigger = 'vp_pool' | 'tableau'
+
+export function getEndGameTriggers(
+  players: Player[],
+  vpPoolInitial: number,
+): EndGameTrigger[] {
+  const triggers: EndGameTrigger[] = []
+  if (totalPlayerVp(players) > vpPoolInitial) triggers.push('vp_pool')
+  if (hasTableauEndGameTrigger(players)) triggers.push('tableau')
+  return triggers
+}
+
 /** Whether a ±1 VP change is allowed for this player. */
 export function canAdjustVp(current: number, delta: number): boolean {
   return current + delta >= 0

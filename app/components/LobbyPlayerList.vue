@@ -122,6 +122,20 @@ function isOwnPlayer(player: Player): boolean {
           {{ index + 1 }}
         </span>
         <span class="min-w-0 flex-1 truncate font-medium text-slate-100">{{ player.name }}</span>
+        <label
+          v-if="canToggleTutorial(player)"
+          class="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-400"
+          :title="'Show phase picker hints for ' + player.name"
+        >
+          <input
+            type="checkbox"
+            class="rounded border-space-600 bg-space-800 text-nebula-400 focus:ring-nebula-400/50"
+            :checked="player.tutorialEnabled"
+            @change="emit('setTutorialEnabled', player.id, ($event.target as HTMLInputElement).checked)"
+          />
+          Tutorial
+        </label>
+        <span v-else-if="player.tutorialEnabled" class="shrink-0 text-xs text-nebula-400/80">Tutorial</span>
         <span v-if="isOwnPlayer(player)" class="shrink-0 text-xs text-nebula-400">This device</span>
       </li>
       <li

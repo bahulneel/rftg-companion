@@ -1,8 +1,5 @@
 <script setup lang="ts">
 import type { Expansions, Player } from '~/types/game'
-import { getRulesHints } from '~/utils/rulesHints'
-
-const lobbyHints = getRulesHints('lobby')
 
 const props = defineProps<{
   players: Player[]
@@ -35,6 +32,7 @@ const emit = defineEmits<{
   registerAsPlayerPeer: []
   startGame: []
   'update:expansions': [value: Expansions]
+  setTutorialEnabled: [playerId: string, enabled: boolean]
 }>()
 
 const localName = computed({

@@ -18,6 +18,8 @@ const emit = defineEmits<{
   setRevealIndex: [index: number]
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
+  adjustTableau: [playerId: string, delta: number]
+  setTableau: [playerId: string, value: number]
   finishRound: []
 }>()
 </script>
@@ -37,6 +39,8 @@ const emit = defineEmits<{
     @set-reveal-index="emit('setRevealIndex', $event)"
     @adjust-vp="(playerId, delta) => emit('adjustVp', playerId, delta)"
     @set-vp="(playerId, value) => emit('setVp', playerId, value)"
+    @adjust-tableau="(playerId, delta) => emit('adjustTableau', playerId, delta)"
+    @set-tableau="(playerId, value) => emit('setTableau', playerId, value)"
     @finish-round="emit('finishRound')"
   />
 </template>

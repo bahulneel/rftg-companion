@@ -413,6 +413,12 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
       : store.isHost
         ? 'Choose how you want to join this session.'
         : 'Add players on this device, or continue as a spectator.',
+    canSetTutorialForPlayer: (playerId: string) => {
+      if (!store.state || store.state.screen !== 'lobby') return false
+      const player = store.state.players.find((entry) => entry.id === playerId)
+      if (!player) return false
+      return canSetTutorial(options.peerId.value, store.isHost, player)
+    },
   }))
 
   const select = computed(() => ({

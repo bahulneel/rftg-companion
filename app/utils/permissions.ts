@@ -92,7 +92,15 @@ export function isAuthorized(fromPeerId: string, action: GameAction, state: Game
 
     case 'ADJUST_VP':
     case 'SET_VP':
+    case 'ADJUST_TABLEAU':
+    case 'SET_TABLEAU':
       return canEditVp(fromPeerId, isHost, action.playerId, state.players)
+
+    case 'SET_TUTORIAL_ENABLED': {
+      if (state.screen !== 'lobby') return false
+      const player = findPlayer(state, action.playerId)
+      return player ? canSetTutorial(fromPeerId, isHost, player) : false
+    }
 
     case 'SUBMIT_SCORE': {
       const player = findPlayer(state, action.playerId)

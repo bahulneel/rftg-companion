@@ -1,10 +1,12 @@
 <script setup lang="ts">
 import type { Player, RevealedPhase } from '~/types/game'
 import { getPhaseById } from '~/utils/phases'
-import { getRulesHints } from '~/utils/rulesHints'
-import { shouldEndGameAfterRound, totalPlayerVp } from '~/utils/scoring'
-
-const revealHints = getRulesHints('reveal')
+import {
+  getEndGameTriggers,
+  shouldEndGameAfterRound,
+  TABLEAU_END_GAME_SIZE,
+  totalPlayerVp,
+} from '~/utils/scoring'
 
 const props = defineProps<{
   phases: RevealedPhase[]
@@ -23,6 +25,8 @@ const emit = defineEmits<{
   setRevealIndex: [index: number]
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
+  adjustTableau: [playerId: string, delta: number]
+  setTableau: [playerId: string, value: number]
   finishRound: []
 }>()
 
@@ -35,6 +39,22 @@ const totalVp = computed(() => totalPlayerVp(props.players))
 const gameEndsAfterRound = computed(() =>
   shouldEndGameAfterRound(props.players, props.vpPoolInitial),
 )
+const endGameTriggers = computed(() =>
+  getEndGameTriggers(props.players, props.vpPoolInitial),
+)
+const endGameMessage = computed(() => {
+  const triggers = endGameTriggers.value
+  if (triggers.length === 0) return null
+  const parts: string[] = []
+  if (triggers.includes('vp_pool')) {
+    parts.push('total VP exceeds the pool')
+  }
+  if (triggers.includes('tableau')) {
+    parts.push(`a player has ${TABLEAU_END_GAME_SIZE}+ tableau cards`)
+  }
+  return `${parts.join(' and ')} — finish this round for final standings`
+})
+const tableauEndTriggered = computed(() => endGameTriggers.value.includes('tableau'))
 
 function goNext() {
   if (isLastPhase.value) {
@@ -50,13 +70,18 @@ function goNext() {
     <div class="text-center">
       <p class="text-sm uppercase tracking-widest text-slate-400">Round {{ round }}</p>
       <h2 class="mt-1 text-2xl font-bold text-slate-100">Phase Reveal</h2>
-      <p v-if="lastRound && !gameEndsAfterRound" class="mt-2 text-sm font-semibold text-star-400">
+      <p
+        v-if="lastRound && !gameEndsAfterRound && !tableauEndTriggered"
+        class="mt-2 text-sm font-semibold text-star-400"
+      >
         Pool empty — play continues until total VP exceeds {{ vpPoolInitial }}
       </p>
-      <p v-else-if="gameEndsAfterRound" class="mt-2 text-sm font-semibold text-star-400">
-        Total VP exceeds the pool — finish this round for final standings
+      <p v-else-if="endGameMessage" class="mt-2 text-sm font-semibold text-star-400">
+        {{ endGameMessage }}
       </p>
     </div>
+
+    <RulesHint screen="reveal" class="mb-2" />
 
     <div class="rounded-xl border border-space-600 bg-space-800/50 p-4">
       <div class="flex justify-between text-sm">
@@ -72,6 +97,17 @@ function goNext() {
       <p class="mt-2 text-xs text-slate-500">
         Chips in player vaults: {{ totalVp }} / {{ vpPoolInitial }} VP
         <span v-if="gameEndsAfterRound"> · finish this round to score</span>
+      </p>
+      <p class="mt-1 text-xs text-slate-500">
+        Tableau:
+        <template v-for="(player, index) in players" :key="player.id">
+          <span v-if="index > 0"> · </span>
+          <span
+            :class="player.tableauSize >= TABLEAU_END_GAME_SIZE ? 'text-phase-settle font-medium' : ''"
+          >
+            {{ player.name }} {{ player.tableauSize }}
+          </span>
+        </template>
       </p>
     </div>
 
@@ -140,15 +176,24 @@ function goNext() {
           >
             {{ player.name }}
           </span>
-          <EditableVpScore
-            :value="player.vpChips"
-            :vp-pool="vpPool"
-            :vp-pool-initial="vpPoolInitial"
-            :editable="canEditPlayer(player.id)"
-            compact
-            @adjust="emit('adjustVp', player.id, $event)"
-            @set="emit('setVp', player.id, $event)"
-          />
+          <div class="flex items-center gap-3">
+            <EditableVpScore
+              :value="player.vpChips"
+              :vp-pool="vpPool"
+              :vp-pool-initial="vpPoolInitial"
+              :editable="canEditPlayer(player.id)"
+              compact
+              @adjust="emit('adjustVp', player.id, $event)"
+              @set="emit('setVp', player.id, $event)"
+            />
+            <EditableTableauScore
+              :value="player.tableauSize"
+              :editable="canEditPlayer(player.id)"
+              compact
+              @adjust="emit('adjustTableau', player.id, $event)"
+              @set="emit('setTableau', player.id, $event)"
+            />
+          </div>
         </div>
       </div>
 

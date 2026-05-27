@@ -1,5 +1,6 @@
 <script setup lang="ts">
 import type { Player } from '~/types/game'
+import { TABLEAU_END_GAME_SIZE } from '~/utils/scoring'
 
 const props = defineProps<{
   players: Player[]
@@ -15,6 +16,8 @@ const props = defineProps<{
 const emit = defineEmits<{
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
+  adjustTableau: [playerId: string, delta: number]
+  setTableau: [playerId: string, value: number]
   endGame: []
 }>()
 
@@ -26,25 +29,39 @@ const primaryPlayer = computed(() =>
 const poolPercent = computed(() =>
   props.vpPoolInitial > 0 ? (props.vpPool / props.vpPoolInitial) * 100 : 0,
 )
+const tableauEndTriggered = computed(() =>
+  props.players.some((player) => player.tableauSize >= TABLEAU_END_GAME_SIZE),
+)
 </script>
 
 <template>
   <div>
     <button
       type="button"
-      class="fixed bottom-4 right-4 z-40 flex items-center gap-2 rounded-full border border-star-400/30 bg-space-800 px-4 py-2.5 shadow-lg shadow-black/40"
+      class="fixed bottom-4 right-4 z-40 flex max-w-[min(100vw-2rem,20rem)] flex-col items-end gap-0.5 rounded-full border border-star-400/30 bg-space-800 px-4 py-2.5 shadow-lg shadow-black/40 text-left"
       @click="open = !open"
     >
-      <span class="text-star-400">◆</span>
-      <span class="text-sm font-semibold">VP: {{ primaryPlayer?.vpChips ?? 0 }}</span>
-      <span class="text-xs text-slate-400">Pool: {{ vpPool }}</span>
+      <span class="flex items-center gap-2">
+        <span class="text-star-400">◆</span>
+        <span class="text-sm font-semibold">VP: {{ primaryPlayer?.vpChips ?? 0 }}</span>
+        <span class="text-xs text-slate-400">Pool: {{ vpPool }}</span>
+      </span>
+      <span class="pr-1 text-xs text-phase-settle">
+        Tableau: {{ primaryPlayer?.tableauSize ?? 0 }}
+      </span>
     </button>
 
     <div
-      v-if="lastRound && !gameEnded"
+      v-if="lastRound && !gameEnded && !tableauEndTriggered"
       class="fixed top-0 inset-x-0 z-50 animate-pulse-glow bg-star-400 px-4 py-3 text-center font-bold text-space-950"
     >
       ⚠ Pool empty — game ends after a round where total VP exceeds the pool.
+    </div>
+    <div
+      v-else-if="tableauEndTriggered && !gameEnded"
+      class="fixed top-0 inset-x-0 z-50 animate-pulse-glow bg-phase-settle px-4 py-3 text-center font-bold text-space-950"
+    >
+      ⚠ A player has {{ TABLEAU_END_GAME_SIZE }}+ tableau cards — finish this round to score.
     </div>
 
     <Transition
@@ -60,13 +77,13 @@ const poolPercent = computed(() =>
         class="fixed inset-x-0 bottom-0 z-40 max-h-[70dvh] overflow-y-auto rounded-t-2xl border-t border-space-600 bg-space-900 p-4 shadow-2xl"
       >
         <div class="mb-4 flex items-center justify-between">
-          <h3 class="text-lg font-bold text-slate-100">VP Chip Tracker</h3>
+          <h3 class="text-lg font-bold text-slate-100">Score Tracker</h3>
           <button type="button" class="text-slate-400 hover:text-slate-200" @click="open = false">
             ✕
           </button>
         </div>
 
-        <RulesHint :items="vpHints" class="mb-4" />
+        <RulesHint screen="vp" class="mb-4" />
 
         <div class="mb-4 rounded-xl border border-space-600 bg-space-800/50 p-4">
           <div class="flex justify-between text-sm">
@@ -79,22 +96,38 @@ const poolPercent = computed(() =>
               :style="{ width: `${poolPercent}%` }"
             />
           </div>
+          <p class="mt-2 text-xs text-slate-500">
+            Tableau end game at {{ TABLEAU_END_GAME_SIZE }}+ face-up cards (start world counts as 1).
+          </p>
         </div>
 
         <div
           v-if="primaryPlayer && canEditPlayer(primaryPlayer.id)"
-          class="mb-4 rounded-xl border border-nebula-400/30 bg-nebula-400/10 p-4"
+          class="mb-4 space-y-4 rounded-xl border border-nebula-400/30 bg-nebula-400/10 p-4"
         >
-          <p class="text-sm text-slate-400">Active VP Vault</p>
-          <div class="mt-2 flex justify-center">
-            <EditableVpScore
-              :value="primaryPlayer.vpChips"
-              :vp-pool="vpPool"
-              :vp-pool-initial="vpPoolInitial"
-              :editable="true"
-              @adjust="emit('adjustVp', primaryPlayer.id, $event)"
-              @set="emit('setVp', primaryPlayer.id, $event)"
-            />
+          <div>
+            <p class="text-sm text-slate-400">Active VP Vault</p>
+            <div class="mt-2 flex justify-center">
+              <EditableVpScore
+                :value="primaryPlayer.vpChips"
+                :vp-pool="vpPool"
+                :vp-pool-initial="vpPoolInitial"
+                :editable="true"
+                @adjust="emit('adjustVp', primaryPlayer.id, $event)"
+                @set="emit('setVp', primaryPlayer.id, $event)"
+              />
+            </div>
+          </div>
+          <div>
+            <p class="text-sm text-slate-400">Tableau size (face-up cards)</p>
+            <div class="mt-2 flex justify-center">
+              <EditableTableauScore
+                :value="primaryPlayer.tableauSize"
+                :editable="true"
+                @adjust="emit('adjustTableau', primaryPlayer.id, $event)"
+                @set="emit('setTableau', primaryPlayer.id, $event)"
+              />
+            </div>
           </div>
         </div>
 
@@ -103,24 +136,49 @@ const poolPercent = computed(() =>
           <div
             v-for="player in players"
             :key="player.id"
-            class="flex items-center justify-between rounded-lg bg-space-800/50 px-3 py-2"
+            class="rounded-lg bg-space-800/50 px-3 py-2"
           >
-            <span
-              :class="player.id === primaryVaultPlayerId ? 'text-nebula-300 font-medium' : 'text-slate-300'"
-            >
-              {{ player.name }}
-            </span>
-            <EditableVpScore
-              v-if="canEditPlayer(player.id)"
-              :value="player.vpChips"
-              :vp-pool="vpPool"
-              :vp-pool-initial="vpPoolInitial"
-              :editable="true"
-              compact
-              @adjust="emit('adjustVp', player.id, $event)"
-              @set="emit('setVp', player.id, $event)"
-            />
-            <span v-else class="font-semibold text-star-400">{{ player.vpChips }} VP</span>
+            <div class="flex items-center justify-between gap-2">
+              <span
+                :class="player.id === primaryVaultPlayerId ? 'text-nebula-300 font-medium' : 'text-slate-300'"
+              >
+                {{ player.name }}
+              </span>
+              <div class="flex shrink-0 items-center gap-3">
+                <div class="text-right">
+                  <p class="text-[10px] uppercase text-slate-500">VP</p>
+                  <EditableVpScore
+                    v-if="canEditPlayer(player.id)"
+                    :value="player.vpChips"
+                    :vp-pool="vpPool"
+                    :vp-pool-initial="vpPoolInitial"
+                    :editable="true"
+                    compact
+                    @adjust="emit('adjustVp', player.id, $event)"
+                    @set="emit('setVp', player.id, $event)"
+                  />
+                  <span v-else class="font-semibold text-star-400">{{ player.vpChips }}</span>
+                </div>
+                <div class="text-right">
+                  <p class="text-[10px] uppercase text-slate-500">Tab</p>
+                  <EditableTableauScore
+                    v-if="canEditPlayer(player.id)"
+                    :value="player.tableauSize"
+                    :editable="true"
+                    compact
+                    @adjust="emit('adjustTableau', player.id, $event)"
+                    @set="emit('setTableau', player.id, $event)"
+                  />
+                  <span
+                    v-else
+                    class="font-semibold"
+                    :class="player.tableauSize >= TABLEAU_END_GAME_SIZE ? 'text-phase-settle' : 'text-slate-400'"
+                  >
+                    {{ player.tableauSize }}
+                  </span>
+                </div>
+              </div>
+            </div>
           </div>
         </div>
 

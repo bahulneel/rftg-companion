@@ -341,6 +341,7 @@ async function copyInviteLink() {
         @register-as-player-peer="controller.registerAsPlayerPeer()"
         @start-game="controller.startGame()"
         @update:expansions="controller.updateExpansions"
+        @set-tutorial-enabled="(id, enabled) => controller.setTutorialEnabled(id, enabled)"
         @copy-invite="copyInviteLink"
       />
     </template>

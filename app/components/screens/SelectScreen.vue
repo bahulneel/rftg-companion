@@ -24,6 +24,7 @@ defineProps<{
   }
   showVpTracker: boolean
   showEndGame: boolean
+  showTutorialBlurbs: boolean
   canEditPlayer: (playerId: string) => boolean
   primaryVaultPlayerId: string
 }>()
@@ -34,6 +35,8 @@ const emit = defineEmits<{
   confirm: []
   adjustVp: [playerId: string, delta: number]
   setVp: [playerId: string, value: number]
+  adjustTableau: [playerId: string, delta: number]
+  setTableau: [playerId: string, value: number]
   endGame: []
 }>()
 </script>
@@ -64,25 +67,28 @@ const emit = defineEmits<{
     </div>
 
     <template v-else-if="showPhasePicker">
-      <RulesHint :items="selectHints" />
+      <RulesHint screen="select" :player-count="playerCount" class="mb-2" />
+
       <PhasePicker
         :expansions="expansions"
         :player-count="playerCount"
         :action-pick-limit="actionPickLimit"
         :selected="selections"
         :locked="confirmed"
+        :show-tutorial-blurbs="showTutorialBlurbs"
         @update="emit('updateSelections', $event)"
         @confirm="emit('confirm')"
       />
     </template>
 
     <PlayerStatusList
+      v-if="!showHandoff"
       :players="allPlayers"
       :my-id="highlightPlayerId"
     />
 
     <VpTracker
-      v-if="showVpTracker"
+      v-if="showVpTracker && !showHandoff"
       :players="allPlayers"
       :primary-vault-player-id="primaryVaultPlayerId"
       :vp-pool="vp.pool"
@@ -93,6 +99,8 @@ const emit = defineEmits<{
       :can-edit-player="canEditPlayer"
       @adjust-vp="(playerId, delta) => emit('adjustVp', playerId, delta)"
       @set-vp="(playerId, value) => emit('setVp', playerId, value)"
+      @adjust-tableau="(playerId, delta) => emit('adjustTableau', playerId, delta)"
+      @set-tableau="(playerId, value) => emit('setTableau', playerId, value)"
       @end-game="emit('endGame')"
     />
   </div>
