@@ -1,10 +1,11 @@
 <script setup lang="ts">
 import type { Expansions, PhaseId } from '~/types/game'
-import { getAvailablePhases, getPhaseById, getPhaseLimit } from '~/utils/phases'
+import { getAvailablePhases, getPhaseById } from '~/utils/phases'
 
 const props = defineProps<{
   expansions: Expansions
   playerCount: number
+  actionPickLimit: number
   selected: PhaseId[]
   locked: boolean
 }>()
@@ -14,8 +15,8 @@ const emit = defineEmits<{
   confirm: []
 }>()
 
-const limit = computed(() => getPhaseLimit(props.playerCount))
-const available = computed(() => getAvailablePhases(props.expansions))
+const limit = computed(() => props.actionPickLimit)
+const available = computed(() => getAvailablePhases(props.expansions, props.playerCount))
 
 function togglePhase(id: PhaseId) {
   if (props.locked) return
@@ -37,9 +38,14 @@ const canConfirm = computed(() => props.selected.length === limit.value && !prop
 
 <template>
   <div class="space-y-4">
-    <div class="flex items-center justify-between">
-      <h2 class="text-lg font-semibold text-slate-100">Choose Phases</h2>
-      <span class="text-sm text-slate-400">
+    <div class="flex items-center justify-between gap-3">
+      <div>
+        <h2 class="text-lg font-semibold text-slate-100">Choose Phases</h2>
+        <p v-if="limit === 2" class="mt-0.5 text-xs text-slate-400">
+          Experienced 2-player: pick 2 action cards
+        </p>
+      </div>
+      <span class="shrink-0 text-sm text-slate-400">
         {{ selected.length }} / {{ limit }} selected
       </span>
     </div>

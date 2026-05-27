@@ -13,6 +13,7 @@ import {
   rankPlayers,
   shouldEndGameAfterRound,
 } from '~/utils/scoring'
+import { getPhaseLimit } from '~/utils/phases'
 import {
   loadSavedLocalPlayers,
   maxLocalPlayerCounter,
@@ -429,6 +430,7 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     confirmed: isConfirmed.value,
     expansions: store.state?.expansions ?? draftExpansions.value,
     playerCount: store.playerCount,
+    actionPickLimit: store.state?.actionPickLimit ?? getPhaseLimit(store.playerCount),
     highlightPlayerId: highlightPlayerId.value,
     vp: {
       pool: store.state?.vpPool ?? 0,
