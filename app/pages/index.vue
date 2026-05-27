@@ -67,28 +67,26 @@ function joinFromInvite() {
       </div>
 
       <p class="text-sm leading-relaxed text-slate-400">
-        Everyone plays at one table. The host shares a QR code so others can connect their devices —
-        one device per player, or share a device between several.
+        Track phases, VP chips, and tableau size for your table. Choose how your group wants to use devices.
       </p>
 
-      <button
-        type="button"
-        class="w-full rounded-2xl bg-nebula-400 py-4 text-lg font-bold text-space-950 shadow-lg shadow-nebula-400/20 transition hover:bg-nebula-300 active:scale-[0.98]"
-        @click="createGame"
-      >
-        Create Game
-      </button>
+      <div class="space-y-3">
+        <button
+          type="button"
+          class="w-full rounded-2xl bg-nebula-400 py-4 text-lg font-bold text-space-950 shadow-lg shadow-nebula-400/20 transition hover:bg-nebula-300 active:scale-[0.98]"
+          @click="playLocal"
+        >
+          Play on one device
+        </button>
 
-      <button
-        type="button"
-        class="w-full rounded-2xl border border-space-600 py-4 text-lg font-semibold text-slate-200 transition hover:border-nebula-400 hover:text-nebula-300 active:scale-[0.98]"
-        @click="playLocal"
-      >
-        Play on One Device
-      </button>
-      <p class="text-xs text-slate-500">
-        One device, several players: pass the phone between them. No Wi‑Fi pairing needed.
-      </p>
+        <button
+          type="button"
+          class="w-full rounded-2xl border border-space-600 py-4 text-lg font-semibold text-slate-200 transition hover:border-nebula-400 hover:text-nebula-300 active:scale-[0.98]"
+          @click="createGame"
+        >
+          Okay on multiple devices
+        </button>
+      </div>
 
       <div class="space-y-3">
         <div class="relative">
