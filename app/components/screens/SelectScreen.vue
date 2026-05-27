@@ -1,7 +1,8 @@
 <script setup lang="ts">
-import type { Expansions, Player, PhaseId } from '~/types/game'
+import type { CostModifier, Expansions, Player, PhaseId } from '~/types/game'
+import { getRulesHints } from '~/utils/rulesHints'
 
-defineProps<{
+const props = defineProps<{
   round: number
   allPlayers: Player[]
   actingPlayer: Player | null
@@ -27,7 +28,16 @@ defineProps<{
   showTutorialBlurbs: boolean
   canEditPlayer: (playerId: string) => boolean
   primaryVaultPlayerId: string
+  costModifiers: CostModifier[]
+  canEditCostPlanning: boolean
 }>()
+
+const selectHints = computed(() =>
+  getRulesHints('select', {
+    playerCount: props.playerCount,
+    actionPickLimit: props.actionPickLimit,
+  }),
+)
 
 const emit = defineEmits<{
   ready: []
@@ -37,6 +47,7 @@ const emit = defineEmits<{
   setVp: [playerId: string, value: number]
   adjustTableau: [playerId: string, delta: number]
   setTableau: [playerId: string, value: number]
+  updateCostModifiers: [modifiers: CostModifier[]]
   endGame: []
 }>()
 </script>
@@ -67,7 +78,15 @@ const emit = defineEmits<{
     </div>
 
     <template v-else-if="showPhasePicker">
-      <RulesHint screen="select" :player-count="playerCount" class="mb-2" />
+      <RulesHint :items="selectHints" class="mb-2" />
+
+      <PlayerSecretTools
+        v-if="actingPlayer && canEditCostPlanning"
+        :modifiers="costModifiers"
+        :editable="!confirmed"
+        class="mb-1"
+        @update:modifiers="emit('updateCostModifiers', $event)"
+      />
 
       <PhasePicker
         :expansions="expansions"

@@ -304,6 +304,10 @@ async function copyInviteLink() {
           @confirm="controller.confirmSelection()"
           @adjust-vp="controller.adjustVp"
           @set-vp="controller.setVp"
+          @update-cost-modifiers="(modifiers) => {
+            const id = select.actingPlayer?.id
+            if (id) controller.setCostModifiers(id, modifiers)
+          }"
           @end-game="controller.endGame()"
         />
 

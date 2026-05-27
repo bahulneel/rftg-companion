@@ -69,6 +69,7 @@ function createInitialState(code: string, hostId: string): GameState {
     lastRound: false,
     gameEnded: false,
     scores: {},
+    costPlanning: {},
   }
 }
 
@@ -115,6 +116,7 @@ export const useGameStore = defineStore('game', () => {
           { ...score, tiebreakSubmitted: score.tiebreakSubmitted ?? false },
         ]),
       ),
+      costPlanning: newState.costPlanning ?? {},
     }
   }
 
@@ -171,6 +173,7 @@ export const useGameStore = defineStore('game', () => {
         s.vpPool = s.vpPoolInitial
         s.lastRound = false
         s.gameEnded = false
+        s.costPlanning = {}
         for (const player of s.players) {
           player.status = 'thinking'
           player.vpChips = 0
@@ -178,6 +181,7 @@ export const useGameStore = defineStore('game', () => {
           s.selections[player.id] = []
           s.confirmed[player.id] = false
           s.scores[player.id] = defaultScoreInput()
+          s.costPlanning[player.id] = { modifiers: [] }
         }
         break
       }
@@ -222,6 +226,7 @@ export const useGameStore = defineStore('game', () => {
           player.status = 'thinking'
           s.selections[player.id] = []
           s.confirmed[player.id] = false
+          s.costPlanning[player.id] = s.costPlanning[player.id] ?? { modifiers: [] }
         }
         break
       }
@@ -302,6 +307,12 @@ export const useGameStore = defineStore('game', () => {
         if (s.screen !== 'lobby') break
         const player = s.players.find((entry) => entry.id === action.playerId)
         if (player) player.tutorialEnabled = action.enabled
+        break
+      }
+
+      case 'SET_COST_MODIFIERS': {
+        if (s.screen !== 'select') break
+        s.costPlanning[action.playerId] = { modifiers: action.modifiers }
         break
       }
     }
