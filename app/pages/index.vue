@@ -84,7 +84,7 @@ function joinFromInvite() {
           class="w-full rounded-2xl border border-space-600 py-4 text-lg font-semibold text-slate-200 transition hover:border-nebula-400 hover:text-nebula-300 active:scale-[0.98]"
           @click="createGame"
         >
-          Okay on multiple devices
+          Play on multiple devices
         </button>
       </div>
 

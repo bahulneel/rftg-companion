@@ -36,12 +36,14 @@ watch(
     >
       <div
         v-if="open"
-        class="fixed inset-x-0 bottom-0 z-50 max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t border-space-600 bg-space-900 p-4 shadow-2xl"
+        class="fixed inset-x-0 bottom-0 z-[60] max-h-[85dvh] overflow-y-auto rounded-t-2xl border-t border-space-600 bg-space-900 p-4 pb-[max(1rem,env(safe-area-inset-bottom))] shadow-2xl"
       >
         <div class="mb-4 flex items-center justify-between">
           <div>
-            <h3 class="text-lg font-bold text-slate-100">Card cost calculator</h3>
-            <p class="text-xs text-slate-500">Build the cost strip, then see what you pay after modifiers.</p>
+            <h3 class="text-lg font-bold text-slate-100">Card cost helper</h3>
+            <p class="text-xs text-slate-500">
+              Match the symbols on the card, then see what you actually pay after your discounts.
+            </p>
           </div>
           <button type="button" class="text-slate-400 hover:text-slate-200" @click="emit('close')">
             ✕
@@ -129,7 +131,7 @@ watch(
 
     <div
       v-if="open"
-      class="fixed inset-0 z-40 bg-black/50"
+      class="fixed inset-0 z-[55] bg-black/60"
       @click="emit('close')"
     />
   </Teleport>
