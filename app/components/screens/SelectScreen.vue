@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import type { CostModifier, Expansions, Player, PhaseId } from '~/types/game'
+import type { EmpireBonus, Expansions, Player, PhaseId } from '~/types/game'
 import { getRulesHints } from '~/utils/rulesHints'
 
 const props = defineProps<{
@@ -28,8 +28,8 @@ const props = defineProps<{
   showTutorialBlurbs: boolean
   canEditPlayer: (playerId: string) => boolean
   primaryScorePlayerId: string
-  costModifiers: CostModifier[]
-  canEditCostPlanning: boolean
+  empireBonuses: EmpireBonus[]
+  canEditEmpireBonuses: boolean
 }>()
 
 const selectHints = computed(() =>
@@ -47,7 +47,7 @@ const emit = defineEmits<{
   setVp: [playerId: string, value: number]
   adjustEmpire: [playerId: string, delta: number]
   setEmpire: [playerId: string, value: number]
-  updateCostModifiers: [modifiers: CostModifier[]]
+  updateEmpireBonuses: [bonuses: EmpireBonus[]]
   endGame: []
 }>()
 </script>
@@ -81,11 +81,11 @@ const emit = defineEmits<{
       <RulesHint :items="selectHints" class="mb-2" />
 
       <PlayerSecretTools
-        v-if="actingPlayer && canEditCostPlanning"
-        :modifiers="costModifiers"
+        v-if="actingPlayer && canEditEmpireBonuses"
+        :empire-bonuses="empireBonuses"
         :editable="!confirmed"
         class="mb-1"
-        @update:modifiers="emit('updateCostModifiers', $event)"
+        @update:empire-bonuses="emit('updateEmpireBonuses', $event)"
       />
 
       <PhasePicker
