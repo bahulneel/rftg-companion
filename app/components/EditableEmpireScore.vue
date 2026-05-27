@@ -1,5 +1,5 @@
 <script setup lang="ts">
-import { canAdjustTableau } from '~/utils/scoring'
+import { canAdjustEmpire } from '~/utils/scoring'
 
 const props = defineProps<{
   value: number
@@ -15,8 +15,8 @@ const emit = defineEmits<{
 const editing = ref(false)
 const draft = ref('')
 
-const canIncrease = computed(() => props.editable && canAdjustTableau(props.value, 1))
-const canDecrease = computed(() => props.editable && canAdjustTableau(props.value, -1))
+const canIncrease = computed(() => props.editable && canAdjustEmpire(props.value, 1))
+const canDecrease = computed(() => props.editable && canAdjustEmpire(props.value, -1))
 
 function startEdit() {
   if (!props.editable) return

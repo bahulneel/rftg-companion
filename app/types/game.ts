@@ -13,6 +13,17 @@ export type PhaseId =
 
 export type GameScreen = 'lobby' | 'select' | 'reveal' | 'scoring'
 
+export interface CostModifier {
+  id: string
+  label: string
+  discardDelta: number
+  militaryDelta: number
+}
+
+export interface PlayerCostPlanning {
+  modifiers: CostModifier[]
+}
+
 export interface Expansions {
   gatheringStorm: boolean
   rebelVsImperium: boolean
@@ -25,8 +36,8 @@ export interface Player {
   ownerPeerId: string
   name: string
   vpChips: number
-  /** Face-up cards in tableau (start world counts as 1 when the game begins). */
-  tableauSize: number
+  /** Cards in the player's empire (start world counts as 1 when the game begins). */
+  empireSize: number
   tutorialEnabled: boolean
   status: 'thinking' | 'ready'
 }
@@ -72,6 +83,8 @@ export interface GameState {
   lastRound: boolean
   gameEnded: boolean
   scores: Record<string, ScoreInput>
+  /** Per-player cost modifiers during secret planning (select phase). */
+  costPlanning: Record<string, PlayerCostPlanning>
 }
 
 export type GameAction =
@@ -88,7 +101,10 @@ export type GameAction =
   | { type: 'SET_REVEAL_INDEX'; index: number }
   | { type: 'ADJUST_VP'; playerId: string; delta: number }
   | { type: 'SET_VP'; playerId: string; vpChips: number }
+  | { type: 'ADJUST_EMPIRE'; playerId: string; delta: number }
+  | { type: 'SET_EMPIRE'; playerId: string; empireSize: number }
   | { type: 'END_GAME' }
   | { type: 'SUBMIT_TIEBREAK'; playerId: string; goodsOnWorlds: number; cardsInHand: number }
   | { type: 'SUBMIT_SCORE'; playerId: string; score: Partial<ScoreInput> }
   | { type: 'SET_TUTORIAL_ENABLED'; playerId: string; enabled: boolean }
+  | { type: 'SET_COST_MODIFIERS'; playerId: string; modifiers: CostModifier[] }

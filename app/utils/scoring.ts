@@ -81,25 +81,25 @@ export function clampVpChips(value: number): number {
   return Math.max(0, Math.floor(value))
 }
 
-/** RFTG: each player starts with one face-up start world in tableau. */
-export const TABLEAU_START_SIZE = 1
+/** RFTG: each player starts with their start world in their empire (counts as 1). */
+export const EMPIRE_START_SIZE = 1
 
-/** Game ends after the round in which any player has this many+ face-up tableau cards. */
-export const TABLEAU_END_GAME_SIZE = 12
+/** Game ends after the round in which any player reaches this empire size. */
+export const EMPIRE_END_GAME_SIZE = 12
 
-export function clampTableauSize(value: number): number {
+export function clampEmpireSize(value: number): number {
   return Math.max(0, Math.floor(value))
 }
 
-export function canAdjustTableau(current: number, delta: number): boolean {
+export function canAdjustEmpire(current: number, delta: number): boolean {
   return current + delta >= 0
 }
 
-export function hasTableauEndGameTrigger(players: Player[]): boolean {
-  return players.some((player) => player.tableauSize >= TABLEAU_END_GAME_SIZE)
+export function hasEmpireEndGameTrigger(players: Player[]): boolean {
+  return players.some((player) => player.empireSize >= EMPIRE_END_GAME_SIZE)
 }
 
-export type EndGameTrigger = 'vp_pool' | 'tableau'
+export type EndGameTrigger = 'vp_pool' | 'empire'
 
 export function getEndGameTriggers(
   players: Player[],
@@ -107,7 +107,7 @@ export function getEndGameTriggers(
 ): EndGameTrigger[] {
   const triggers: EndGameTrigger[] = []
   if (totalPlayerVp(players) > vpPoolInitial) triggers.push('vp_pool')
-  if (hasTableauEndGameTrigger(players)) triggers.push('tableau')
+  if (hasEmpireEndGameTrigger(players)) triggers.push('empire')
   return triggers
 }
 
@@ -157,12 +157,12 @@ export function applyVpTarget(
   }
 }
 
-/** Game ends after the round in which total VP scored exceeds the pool (not when equal). */
+/** Game ends after the round in which a trigger is met (VP pool or empire size). */
 export function shouldEndGameAfterRound(
   players: Player[],
   vpPoolInitial: number,
 ): boolean {
-  return totalPlayerVp(players) > vpPoolInitial
+  return getEndGameTriggers(players, vpPoolInitial).length > 0
 }
 
 /** Players tied for the highest score (VP total only — before tie-breakers resolve). */
@@ -200,14 +200,14 @@ export interface TiebreakSummary {
 
 function winnerOverLoserReason(winner: ScoreInput, loser: ScoreInput): string {
   if (winner.goodsOnWorlds !== loser.goodsOnWorlds) {
-    return `more goods on worlds (${winner.goodsOnWorlds} vs ${loser.goodsOnWorlds})`
+    return `more cargo on planets (${winner.goodsOnWorlds} vs ${loser.goodsOnWorlds})`
   }
   return `more cards in hand (${winner.cardsInHand} vs ${loser.cardsInHand})`
 }
 
 function loserVsWinnerReason(loser: ScoreInput, winner: ScoreInput): string {
   if (loser.goodsOnWorlds !== winner.goodsOnWorlds) {
-    return `fewer goods on worlds (${loser.goodsOnWorlds} vs ${winner.goodsOnWorlds})`
+    return `fewer cargo on planets (${loser.goodsOnWorlds} vs ${winner.goodsOnWorlds})`
   }
   return `fewer cards in hand (${loser.cardsInHand} vs ${winner.cardsInHand})`
 }
@@ -229,7 +229,7 @@ export function buildTiebreakSummary(ranked: RankedPlayer[]): TiebreakSummary | 
   if (winners.length === leaders.length) {
     return {
       headline: 'Tie-break did not separate the leaders',
-      detail: `All leaders had ${best.goodsOnWorlds} goods on worlds and ${best.cardsInHand} cards in hand, so they share the win.`,
+      detail: `All leaders had ${best.goodsOnWorlds} cargo on planets and ${best.cardsInHand} cards in hand, so they share the win.`,
       playerNotes: Object.fromEntries(
         leaders.map((player) => [player.id, 'Shared win — tie-break was identical']),
       ),
@@ -254,7 +254,7 @@ export function buildTiebreakSummary(ranked: RankedPlayer[]): TiebreakSummary | 
 
   return {
     headline,
-    detail: `Leaders were tied on ${topTotal} VP. Official tie-break is most goods on worlds, then most cards in hand — decided by ${decidingReason}.`,
+    detail: `Leaders were tied on ${topTotal} VP. Tie-break is most cargo on planets, then most cards in hand — decided by ${decidingReason}.`,
     playerNotes,
   }
 }

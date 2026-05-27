@@ -1,6 +1,7 @@
 import type { Expansions, GameScreen, PhaseId, Player } from '~/types/game'
 import type { GameTransport } from '~/composables/gameTransport'
 import { LOCAL_HOST_ID } from '~/composables/gameTransport'
+import type { CostModifier } from '~/types/game'
 import {
   canControlSession,
   canEditVp,
@@ -8,6 +9,7 @@ import {
   canSetTutorial,
   ownedPlayers,
 } from '~/utils/permissions'
+import { isPlayerTutorialEnabled } from '~/utils/tutorial'
 import {
   getVpTiedPlayerIds,
   needsTiebreakInput,
@@ -180,6 +182,14 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     dispatch({ type: 'SET_VP', playerId, vpChips: value })
   }
 
+  function adjustEmpire(playerId: string, delta: number) {
+    dispatch({ type: 'ADJUST_EMPIRE', playerId, delta })
+  }
+
+  function setEmpire(playerId: string, value: number) {
+    dispatch({ type: 'SET_EMPIRE', playerId, empireSize: value })
+  }
+
   function setRevealIndex(index: number) {
     dispatch({ type: 'SET_REVEAL_INDEX', index })
   }
@@ -199,6 +209,10 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
 
   function setTutorialEnabled(playerId: string, enabled: boolean) {
     dispatch({ type: 'SET_TUTORIAL_ENABLED', playerId, enabled })
+  }
+
+  function setCostModifiers(playerId: string, modifiers: CostModifier[]) {
+    dispatch({ type: 'SET_COST_MODIFIERS', playerId, modifiers })
   }
 
   function submitTiebreak(goodsOnWorlds: number, cardsInHand: number) {
@@ -452,7 +466,16 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     showVpTracker: !store.isSpectator,
     showEndGame: canControlSession(store.isHost),
     canEditPlayer,
-    primaryVaultPlayerId: actingPlayerId.value ?? '',
+    primaryScorePlayerId: actingPlayerId.value ?? '',
+    costModifiers:
+      actingPlayerId.value && store.state?.costPlanning?.[actingPlayerId.value]
+        ? store.state.costPlanning[actingPlayerId.value]!.modifiers
+        : [],
+    showTutorialBlurbs: isPlayerTutorialEnabled(
+      store.state?.players ?? [],
+      actingPlayerId.value,
+    ),
+    canEditCostPlanning: !!actingPlayerId.value && !store.isSpectator,
   }))
 
   const reveal = computed(() => ({
@@ -510,11 +533,14 @@ export function usePeerGameController(options: PeerGameControllerOptions) {
     handDeviceToPlayer,
     adjustVp,
     setVp,
+    adjustEmpire,
+    setEmpire,
     setRevealIndex,
     finishRevealRound,
     endGame,
     submitTiebreak,
     setTutorialEnabled,
+    setCostModifiers,
     initLocalSession,
   }
 }

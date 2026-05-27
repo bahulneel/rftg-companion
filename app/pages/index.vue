@@ -67,7 +67,7 @@ function joinFromInvite() {
       </div>
 
       <p class="text-sm leading-relaxed text-slate-400">
-        Track phases, VP chips, and tableau size for your table. Choose how your group wants to use devices.
+        Track phases, VP chips, and empire size for your table. Choose how your group wants to use devices.
       </p>
 
       <div class="space-y-3">

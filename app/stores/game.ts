@@ -5,7 +5,9 @@ import { buildRevealedPhases, getPhaseLimit } from '~/utils/phases'
 import { ownedPlayers } from '~/utils/permissions'
 import {
   applyVpTarget,
+  clampEmpireSize,
   defaultScoreInput,
+  EMPIRE_START_SIZE,
   vpPoolForPlayerCount,
 } from '~/utils/scoring'
 
@@ -36,7 +38,7 @@ function addPlayerToState(s: GameState, playerId: string, ownerPeerId: string, n
     ownerPeerId,
     name: name.trim() || 'Player',
     vpChips: 0,
-    tableauSize: 0,
+    empireSize: 0,
     tutorialEnabled: false,
     status: 'thinking',
   })
@@ -69,6 +71,7 @@ function createInitialState(code: string, hostId: string): GameState {
     lastRound: false,
     gameEnded: false,
     scores: {},
+    costPlanning: {},
   }
 }
 
@@ -101,11 +104,15 @@ export const useGameStore = defineStore('game', () => {
     state.value = {
       ...newState,
       registeredPeerIds: newState.registeredPeerIds ?? [],
-      players: newState.players.map((player) => ({
-        ...player,
-        ownerPeerId: player.ownerPeerId ?? player.id,
-        tutorialEnabled: player.tutorialEnabled ?? false,
-      })),
+      players: newState.players.map((player) => {
+        const legacy = player as Player & { tableauSize?: number }
+        return {
+          ...player,
+          ownerPeerId: player.ownerPeerId ?? player.id,
+          tutorialEnabled: player.tutorialEnabled ?? false,
+          empireSize: player.empireSize ?? legacy.tableauSize ?? 0,
+        }
+      }),
       revealPhaseIndex: newState.revealPhaseIndex ?? 0,
       actionPickLimit:
         newState.actionPickLimit ?? getPhaseLimit(newState.players.length),
@@ -115,6 +122,7 @@ export const useGameStore = defineStore('game', () => {
           { ...score, tiebreakSubmitted: score.tiebreakSubmitted ?? false },
         ]),
       ),
+      costPlanning: newState.costPlanning ?? {},
     }
   }
 
@@ -171,13 +179,15 @@ export const useGameStore = defineStore('game', () => {
         s.vpPool = s.vpPoolInitial
         s.lastRound = false
         s.gameEnded = false
+        s.costPlanning = {}
         for (const player of s.players) {
           player.status = 'thinking'
           player.vpChips = 0
-          player.tableauSize = TABLEAU_START_SIZE
+          player.empireSize = EMPIRE_START_SIZE
           s.selections[player.id] = []
           s.confirmed[player.id] = false
           s.scores[player.id] = defaultScoreInput()
+          s.costPlanning[player.id] = { modifiers: [] }
         }
         break
       }
@@ -222,6 +232,7 @@ export const useGameStore = defineStore('game', () => {
           player.status = 'thinking'
           s.selections[player.id] = []
           s.confirmed[player.id] = false
+          s.costPlanning[player.id] = s.costPlanning[player.id] ?? { modifiers: [] }
         }
         break
       }
@@ -271,6 +282,24 @@ export const useGameStore = defineStore('game', () => {
         break
       }
 
+      case 'ADJUST_EMPIRE': {
+        const player = s.players.find((entry) => entry.id === action.playerId)
+        if (!player) break
+        const next = clampEmpireSize(player.empireSize + action.delta)
+        if (next === player.empireSize) break
+        player.empireSize = next
+        break
+      }
+
+      case 'SET_EMPIRE': {
+        const player = s.players.find((entry) => entry.id === action.playerId)
+        if (!player) break
+        const next = clampEmpireSize(action.empireSize)
+        if (next === player.empireSize) break
+        player.empireSize = next
+        break
+      }
+
       case 'END_GAME': {
         finishGameFromVp(s)
         break
@@ -302,6 +331,12 @@ export const useGameStore = defineStore('game', () => {
         if (s.screen !== 'lobby') break
         const player = s.players.find((entry) => entry.id === action.playerId)
         if (player) player.tutorialEnabled = action.enabled
+        break
+      }
+
+      case 'SET_COST_MODIFIERS': {
+        if (s.screen !== 'select') break
+        s.costPlanning[action.playerId] = { modifiers: action.modifiers }
         break
       }
     }
