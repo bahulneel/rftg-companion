@@ -1,7 +1,10 @@
 <script setup lang="ts">
 import type { Player, RevealedPhase } from '~/types/game'
 import { getPhaseById } from '~/utils/phases'
+import { getRulesHints } from '~/utils/rulesHints'
 import { shouldEndGameAfterRound, totalPlayerVp } from '~/utils/scoring'
+
+const revealHints = getRulesHints('reveal')
 
 const props = defineProps<{
   phases: RevealedPhase[]

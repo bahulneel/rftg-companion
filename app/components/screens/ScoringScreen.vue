@@ -51,10 +51,12 @@ const emit = defineEmits<{
       </p>
     </div>
 
-    <Leaderboard
-      v-if="!needsTiebreak"
-      :ranked="ranked"
-      :expansions="expansions"
-    />
+    <template v-if="!needsTiebreak">
+      <RulesHint :items="scoringHints" />
+      <Leaderboard
+        :ranked="ranked"
+        :expansions="expansions"
+      />
+    </template>
   </div>
 </template>

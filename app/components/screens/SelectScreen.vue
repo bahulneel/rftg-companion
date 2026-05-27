@@ -64,6 +64,7 @@ const emit = defineEmits<{
     </div>
 
     <template v-else-if="showPhasePicker">
+      <RulesHint :items="selectHints" />
       <PhasePicker
         :expansions="expansions"
         :player-count="playerCount"
