@@ -31,12 +31,30 @@ export interface CostCalculation {
 }
 
 export const COST_MODIFIER_PRESETS: Omit<CostModifier, 'id'>[] = [
-  { label: 'Develop phase (−1 discard)', discardDelta: -1, militaryDelta: 0 },
-  { label: 'Settle phase (−1 discard)', discardDelta: -1, militaryDelta: 0 },
-  { label: 'Settle phase (−1 military)', discardDelta: 0, militaryDelta: -1 },
-  { label: 'Levy (−1 discard)', discardDelta: -1, militaryDelta: 0 },
-  { label: 'Military +1', discardDelta: 0, militaryDelta: 1 },
+  { label: 'You chose Develop', discardDelta: -1, militaryDelta: 0 },
+  { label: 'You chose Settle (pay fewer cards)', discardDelta: -1, militaryDelta: 0 },
+  { label: 'You chose Settle (less military)', discardDelta: 0, militaryDelta: -1 },
+  { label: 'Levy on a world', discardDelta: -1, militaryDelta: 0 },
+  { label: '+1 military from a card', discardDelta: 0, militaryDelta: 1 },
 ]
+
+/** Short plain-English summary for lists. */
+export function formatModifierSummary(mod: CostModifier): string {
+  const parts: string[] = []
+  if (mod.discardDelta < 0) {
+    const n = Math.abs(mod.discardDelta)
+    parts.push(`pay ${n} fewer card${n === 1 ? '' : 's'}`)
+  } else if (mod.discardDelta > 0) {
+    parts.push(`pay ${mod.discardDelta} more card${mod.discardDelta === 1 ? '' : 's'}`)
+  }
+  if (mod.militaryDelta < 0) {
+    const n = Math.abs(mod.militaryDelta)
+    parts.push(`need ${n} less military`)
+  } else if (mod.militaryDelta > 0) {
+    parts.push(`need ${mod.militaryDelta} more military`)
+  }
+  return parts.length > 0 ? parts.join(', ') : 'no change'
+}
 
 let costTokenCounter = 0
 
@@ -67,13 +85,10 @@ export function sumModifierDeltas(modifiers: CostModifier[]): {
   let militaryDelta = 0
   const notes: string[] = []
   for (const mod of modifiers) {
-    if (mod.discardDelta !== 0) {
-      discardDelta += mod.discardDelta
-      notes.push(`${mod.label}: ${mod.discardDelta > 0 ? '+' : ''}${mod.discardDelta} discard`)
-    }
-    if (mod.militaryDelta !== 0) {
-      militaryDelta += mod.militaryDelta
-      notes.push(`${mod.label}: ${mod.militaryDelta > 0 ? '+' : ''}${mod.militaryDelta} military`)
+    discardDelta += mod.discardDelta
+    militaryDelta += mod.militaryDelta
+    if (mod.discardDelta !== 0 || mod.militaryDelta !== 0) {
+      notes.push(`${mod.label} — ${formatModifierSummary(mod)}`)
     }
   }
   return { discardDelta, militaryDelta, notes }
