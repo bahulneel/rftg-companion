@@ -22,10 +22,6 @@ const emit = defineEmits<{
   setTutorialEnabled: [playerId: string, enabled: boolean]
 }>()
 
-function canToggleTutorial(player: Player): boolean {
-  return props.canSetTutorialForPlayer?.(player.id) ?? false
-}
-
 const dragId = ref<string | null>(null)
 const overId = ref<string | null>(null)
 
@@ -129,7 +125,7 @@ function isOwnPlayer(player: Player): boolean {
         </span>
         <span class="min-w-0 flex-1 truncate font-medium text-slate-100">{{ player.name }}</span>
         <label
-          v-if="canToggleTutorial(player)"
+          v-if="canSetTutorialForPlayer?.(player.id)"
           class="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-slate-400"
           :title="'Show phase picker hints for ' + player.name"
         >
