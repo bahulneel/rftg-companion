@@ -132,7 +132,7 @@ function removePlayer(player: Player) {
       <li
         v-for="(player, index) in players"
         :key="player.id"
-        class="touch-manipulation rounded-xl bg-space-800/50 px-3 py-3 transition"
+        class="touch-manipulation rounded-xl border border-space-700/70 bg-space-800/60 px-3 py-2.5 transition"
         :class="{
           'ring-1 ring-nebula-400/50': overId === player.id && dragId !== player.id,
           'opacity-50': dragId === player.id,
@@ -143,7 +143,7 @@ function removePlayer(player: Player) {
         @drop="onDrop(player.id, $event)"
         @dragend="onDragEnd"
       >
-        <div class="flex items-start justify-between gap-3 sm:items-center">
+        <div class="flex items-start justify-between gap-3">
           <div class="min-w-0 flex-1">
             <div class="flex items-center gap-2">
               <span
@@ -155,13 +155,13 @@ function removePlayer(player: Player) {
               </span>
               <span
                 v-if="showOrder"
-                class="inline-flex h-6 min-w-6 items-center justify-center rounded-full bg-space-700 px-1.5 text-xs font-semibold text-slate-300"
+                class="inline-flex h-5 min-w-5 items-center justify-center rounded-full bg-space-700 px-1.5 text-[11px] font-semibold text-slate-300"
               >
                 {{ index + 1 }}
               </span>
               <span class="truncate text-base font-semibold text-slate-100">{{ player.name }}</span>
             </div>
-            <div class="mt-2 flex flex-wrap items-center gap-2 text-xs">
+            <div class="mt-1.5 flex flex-wrap items-center gap-1.5 text-[11px]">
               <span
                 v-if="isOwnPlayer(player)"
                 class="rounded-full border border-nebula-400/30 bg-nebula-400/10 px-2 py-0.5 text-nebula-300"
@@ -172,14 +172,14 @@ function removePlayer(player: Player) {
                 v-if="!canSetTutorialForPlayer?.(player.id) && player.tutorialEnabled"
                 class="rounded-full border border-nebula-400/30 bg-nebula-400/10 px-2 py-0.5 text-nebula-300"
               >
-                Tutorial on
+                Tutorial enabled
               </span>
             </div>
           </div>
           <button
             v-if="canRemovePlayer(player.id)"
             type="button"
-            class="shrink-0 rounded-md border border-red-500/40 px-3 py-1.5 text-xs font-medium text-red-200 transition hover:border-red-400 hover:text-red-100"
+            class="inline-flex h-8 shrink-0 items-center rounded-md border border-red-500/40 px-3 text-xs font-medium text-red-200 transition hover:border-red-400 hover:text-red-100"
             :aria-label="`Remove ${player.name}`"
             @click="removePlayer(player)"
           >
@@ -187,12 +187,15 @@ function removePlayer(player: Player) {
           </button>
         </div>
 
-        <div class="mt-3 flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-          <div v-if="reorderable" class="flex items-center gap-2">
-            <span class="text-[11px] uppercase tracking-wide text-slate-500">Move</span>
+        <div
+          v-if="reorderable || canSetTutorialForPlayer?.(player.id)"
+          class="mt-2.5 flex flex-wrap items-center justify-between gap-2 border-t border-space-700/70 pt-2.5"
+        >
+          <div v-if="reorderable" class="inline-flex items-center gap-1.5 rounded-lg bg-space-900/70 px-2 py-1">
+            <span class="text-[10px] uppercase tracking-wide text-slate-500">Move</span>
             <button
               type="button"
-              class="rounded-md border border-space-600 px-3 py-1.5 text-sm text-slate-300 transition enabled:hover:border-nebula-400 disabled:opacity-40"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-space-600 text-sm text-slate-300 transition enabled:hover:border-nebula-400 disabled:opacity-40"
               :disabled="!canMove(player.id, -1)"
               :aria-label="`Move ${player.name} earlier`"
               @click="movePlayer(player.id, -1)"
@@ -201,7 +204,7 @@ function removePlayer(player: Player) {
             </button>
             <button
               type="button"
-              class="rounded-md border border-space-600 px-3 py-1.5 text-sm text-slate-300 transition enabled:hover:border-nebula-400 disabled:opacity-40"
+              class="inline-flex h-8 w-8 items-center justify-center rounded-md border border-space-600 text-sm text-slate-300 transition enabled:hover:border-nebula-400 disabled:opacity-40"
               :disabled="!canMove(player.id, 1)"
               :aria-label="`Move ${player.name} later`"
               @click="movePlayer(player.id, 1)"
@@ -211,7 +214,7 @@ function removePlayer(player: Player) {
           </div>
           <label
             v-if="canSetTutorialForPlayer?.(player.id)"
-            class="inline-flex cursor-pointer items-center gap-2 self-start rounded-lg border border-space-600 bg-space-800/70 px-2.5 py-1.5 text-xs text-slate-300"
+            class="inline-flex cursor-pointer items-center gap-2 rounded-lg border border-space-600 bg-space-900/60 px-2.5 py-1.5 text-xs text-slate-300"
             :title="'Show card & phase tutorial for ' + player.name"
           >
             <input
