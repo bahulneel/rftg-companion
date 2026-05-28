@@ -32,13 +32,14 @@ function entryKey(entry: DiagnosticEntry) {
 </script>
 
 <template>
-  <div class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-end p-3">
+  <div class="pointer-events-none fixed inset-x-0 bottom-0 z-50 flex justify-end p-3 sm:p-3">
     <button
       type="button"
-      class="pointer-events-auto rounded-full border border-space-600 bg-space-900/95 px-4 py-2 text-xs font-medium text-slate-300 shadow-lg backdrop-blur hover:border-nebula-400 hover:text-nebula-200"
+      class="pointer-events-auto mb-16 rounded-full border border-space-600 bg-space-900/95 px-3 py-2 text-xs font-medium text-slate-300 shadow-lg backdrop-blur hover:border-nebula-400 hover:text-nebula-200 sm:mb-0"
       @click="open = true"
     >
-      Connection log
+      <span class="sm:hidden">Log</span>
+      <span class="hidden sm:inline">Connection log</span>
       <span
         v-if="entries.length"
         class="ml-1.5 rounded-full bg-nebula-400/20 px-1.5 py-0.5 text-[10px] text-nebula-300"

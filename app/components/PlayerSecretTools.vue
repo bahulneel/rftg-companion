@@ -39,7 +39,7 @@ function closeCalculator() {
     <Teleport to="body">
       <button
         type="button"
-        class="fixed bottom-4 left-4 z-[100] flex max-w-[min(100vw-2rem,14rem)] flex-col items-start rounded-full border border-phase-develop/40 bg-space-800 px-4 py-2.5 text-left shadow-lg shadow-black/40 transition hover:border-phase-develop/60 hover:bg-space-700"
+        class="fixed bottom-20 left-4 z-[100] flex max-w-[min(100vw-2rem,14rem)] flex-col items-start rounded-full border border-phase-develop/40 bg-space-800 px-4 py-2.5 text-left shadow-lg shadow-black/40 transition hover:border-phase-develop/60 hover:bg-space-700"
         :class="calculatorOpen ? 'ring-2 ring-phase-develop/50' : ''"
         aria-haspopup="dialog"
         :aria-expanded="calculatorOpen"
